@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.3
+- Added GitHub Actions CI workflow for lint + ZIP build artifact.
+- Added GitHub Actions release workflow that builds ZIP and attaches it to GitHub Release on tag `v*`.
+- Fixed `scripts/build-plugin.sh` so it works directly from repository root in CI/GitHub.
+
+## 0.2.2
+- Patch release to publish install hardening changes under a fresh Git tag.
+
 ## 0.2.1
 - Unified minimum requirements with reporting plugin: WordPress 6.7 and PHP 8.0.
 - Added install/runtime hardening baseline:

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.13 - 2026-05-04
+- v přehledu manuální kontroly přidán popisek s posledním dokončeným během WP CRON
+- v závorce se zobrazuje další plánované spuštění CRON hooku `ar_design_move_unpaid_to_manual_review`
+- časové údaje jsou ve formátu dle nastavení WordPressu
+
 ## 0.2.0
 - Added bootstrap/runtime split with autoloader.
 - Added requirements gate for WordPress, PHP and WooCommerce.

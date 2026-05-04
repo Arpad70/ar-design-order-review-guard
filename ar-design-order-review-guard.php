@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AR Design Order Review Guard
  * Description: Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu.
- * Version: 0.2.12
+ * Version: 0.2.13
  * Author: AR Design
  * Update URI: https://github.com/Arpad70/ar-design-order-review-guard
  * Requires at least: 6.7
@@ -13,7 +13,7 @@ if (! defined('ABSPATH')) {
 	exit;
 }
 
-define('ARDRG_VERSION', '0.2.12');
+define('ARDRG_VERSION', '0.2.13');
 define('ARDRG_DB_VERSION', '0.2.0');
 define('ARDRG_FILE', __FILE__);
 define('ARDRG_BASENAME', plugin_basename(__FILE__));
@@ -35,6 +35,7 @@ final class ArDesignOrderReviewGuard
 	private const OPTION_MANAGER_EMAIL = 'ardrg_manager_email';
 	private const OPTION_SECRET_HASH = 'ardrg_secret_hash';
 	private const OPTION_SECRET_CHANGED_AT = 'ardrg_secret_changed_at';
+	private const OPTION_LAST_CRON_COMPLETED_AT_GMT = 'ardrg_last_cron_completed_at_gmt';
 	private const SECURE_BIN_TABLE = 'ardrg_secure_bin_orders';
 	private const AUDIT_TABLE = 'ardrg_secure_bin_audit';
 	private const SECURE_DELETE_TOKEN_PREFIX = 'ardrg_secure_delete_';
@@ -214,7 +215,7 @@ final class ArDesignOrderReviewGuard
 		submit_button('Vygenerovat nové tajné heslo', 'primary', 'submit', false);
 		echo '</form>';
 
-		echo '<h2 style="margin-top:24px;">Přehled manuální kontroly</h2>';
+		echo '<h2 style="margin-top:24px;display:flex;align-items:baseline;gap:10px;">Přehled manuální kontroly <span style="font-size:13px;font-weight:400;color:#50575e;">' . esc_html(self::getManualReviewCronSummary()) . '</span></h2>';
 		echo '<table class="widefat striped" style="max-width:920px;"><tbody>';
 		echo '<tr><td>Manuální kontrola celkem</td><td><strong>' . esc_html((string) $stats['totals']['all']) . '</strong></td></tr>';
 		echo '<tr><td>Noční (22:00-06:00)</td><td>' . esc_html((string) $stats['totals']['night']) . '</td></tr>';
@@ -1083,6 +1084,8 @@ final class ArDesignOrderReviewGuard
 				wc_release_stock_for_order($order);
 			}
 		}
+
+		update_option(self::OPTION_LAST_CRON_COMPLETED_AT_GMT, gmdate('Y-m-d H:i:s'), false);
 	}
 
 	public static function trackManualReviewLifecycleFlags(int $order_id, string $from, string $to, $order): void
@@ -1201,6 +1204,25 @@ final class ArDesignOrderReviewGuard
 			return $gmt_datetime;
 		}
 		return self::formatLocalDateTimeFromTimestamp((int) $timestamp);
+	}
+
+	private static function getManualReviewCronSummary(): string
+	{
+		$last_completed_gmt = (string) get_option(self::OPTION_LAST_CRON_COMPLETED_AT_GMT, '');
+		$next_scheduled = wp_next_scheduled(self::CRON_HOOK_NAME);
+
+		$last_label = '' !== $last_completed_gmt
+			? self::formatLocalDateTimeFromGmtString($last_completed_gmt)
+			: __('zatím neproběhlo', 'ar-design-order-review-guard');
+		$next_label = false !== $next_scheduled
+			? self::formatLocalDateTimeFromTimestamp((int) $next_scheduled)
+			: __('nenaplánováno', 'ar-design-order-review-guard');
+
+		return sprintf(
+			'Poslední dokončený WP CRON: %s (další plánované spuštění: %s)',
+			$last_label,
+			$next_label
+		);
 	}
 }
 

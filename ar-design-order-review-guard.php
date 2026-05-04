@@ -2,21 +2,29 @@
 /**
  * Plugin Name: AR Design Order Review Guard
  * Description: Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu.
- * Version: 0.2.0
+ * Version: 0.2.1
  * Author: AR Design
- * Requires at least: 6.0
- * Requires PHP: 7.4
+ * Requires at least: 6.7
+ * Requires PHP: 8.0
  */
 
 if (! defined('ABSPATH')) {
 	exit;
 }
 
+define('ARDRG_VERSION', '0.2.1');
+define('ARDRG_DB_VERSION', '0.2.0');
+define('ARDRG_FILE', __FILE__);
+define('ARDRG_PATH', plugin_dir_path(__FILE__));
+
+require_once ARDRG_PATH . 'bootstrap/autoload.php';
+ArDesign\OrderReviewGuard\Support\Autoloader::register();
+
 final class ArDesignOrderReviewGuard
 {
+	public const CRON_HOOK_NAME = 'ar_design_move_unpaid_to_manual_review';
+	public const CRON_RECURRENCE_NAME = 'ar_design_every_ten_minutes';
 	private const STATUS_SLUG = 'manual-review';
-	private const CRON_HOOK = 'ar_design_move_unpaid_to_manual_review';
-	private const CRON_RECURRENCE = 'ar_design_every_ten_minutes';
 	private const STALE_MINUTES = 45;
 	private const DEFAULT_RISK_THRESHOLD = 4;
 	private const NIGHT_RISK_THRESHOLD = 3;
@@ -46,29 +54,12 @@ final class ArDesignOrderReviewGuard
 		add_action('woocommerce_loaded', array(__CLASS__, 'disableWooAutoCancelUnpaid'), 30);
 
 		add_filter('cron_schedules', array(__CLASS__, 'registerTenMinuteCron'));
-		add_action(self::CRON_HOOK, array(__CLASS__, 'moveStaleUnpaidOrdersToManualReview'));
+		add_action(self::CRON_HOOK_NAME, array(__CLASS__, 'moveStaleUnpaidOrdersToManualReview'));
 
 		// High-priority override for AR Design Reporting deletion blockers.
 		add_filter('pre_delete_post', array(__CLASS__, 'allowAuthorizedSecureDeletePreDeletePost'), 999, 2);
 		add_filter('pre_trash_post', array(__CLASS__, 'allowAuthorizedSecureDeletePreTrashPost'), 999, 3);
 		add_filter('woocommerce_pre_delete_order', array(__CLASS__, 'allowAuthorizedSecureDeleteWoo'), 999, 3);
-	}
-
-	public static function activate(): void
-	{
-		self::createTables();
-		if (! wp_next_scheduled(self::CRON_HOOK)) {
-			wp_schedule_event(time() + MINUTE_IN_SECONDS, self::CRON_RECURRENCE, self::CRON_HOOK);
-		}
-	}
-
-	public static function deactivate(): void
-	{
-		$timestamp = wp_next_scheduled(self::CRON_HOOK);
-		while (false !== $timestamp) {
-			wp_unschedule_event($timestamp, self::CRON_HOOK);
-			$timestamp = wp_next_scheduled(self::CRON_HOOK);
-		}
 	}
 
 	public static function registerStatus(): void
@@ -182,6 +173,7 @@ final class ArDesignOrderReviewGuard
 			'secret_generated' => array('success', 'Nové heslo bylo vygenerováno a odesláno.'),
 			'secret_mail_failed' => array('error', 'Heslo bylo uloženo, ale e-mail se nepodařilo odeslat.'),
 			'secure_bin_done' => array('success', 'Objednávka byla přesunuta do Secure Bin a trvale smazána.'),
+			'secure_bin_wrong_secret' => array('error', 'Neplatné tajné heslo. Zkontrolujte heslo a zkuste to znovu.'),
 			'secure_bin_error' => array('error', 'Secure Bin operaci se nepodařilo dokončit.'),
 		);
 		if (! isset($map[$notice])) {
@@ -317,11 +309,11 @@ final class ArDesignOrderReviewGuard
 		$order = wc_get_order($order_id);
 		$user_id = get_current_user_id();
 
-		$secret = (string) wp_unslash($_POST['manager_secret'] ?? '');
+		$secret = trim((string) wp_unslash($_POST['manager_secret'] ?? ''));
 		$hash = (string) get_option(self::OPTION_SECRET_HASH, '');
 		if (! $order instanceof WC_Order || self::STATUS_SLUG !== $order->get_status() || '' === $hash || ! wp_check_password($secret, $hash)) {
 			self::audit('secure_bin_failed', array('reason' => 'validation_failed'), $user_id, $order_id);
-			wp_safe_redirect(admin_url('admin.php?page=ar-order-review-guard&ardrg_notice=secure_bin_error'));
+			wp_safe_redirect(admin_url('admin.php?page=ar-order-review-guard&ardrg_notice=secure_bin_wrong_secret'));
 			exit;
 		}
 
@@ -340,9 +332,62 @@ final class ArDesignOrderReviewGuard
 			exit;
 		}
 
+		self::purgeArDesignReportingTrailAndLogDelete(
+			$order_id,
+			(float) $order->get_total(),
+			(string) $order->get_currency(),
+			$user_id
+		);
+
 		self::audit('secure_bin_success', array('status_before_delete' => self::STATUS_SLUG), $user_id, $order_id);
 		wp_safe_redirect(admin_url('admin.php?page=ar-order-review-guard&ardrg_notice=secure_bin_done'));
 		exit;
+	}
+
+	private static function purgeArDesignReportingTrailAndLogDelete(int $order_id, float $total, string $currency, int $actor_user_id): void
+	{
+		global $wpdb;
+
+		if ($order_id <= 0) {
+			return;
+		}
+
+		$prefix = (string) $wpdb->prefix;
+		$audit_table = $prefix . 'ard_audit_log';
+		$processing_table = $prefix . 'ard_order_processing';
+		$archive_table = $prefix . 'ard_order_archive';
+		$flags_table = $prefix . 'ard_order_flags';
+
+		// Zmazanie predchádzajúcich audit/workflow stôp objednávky.
+		$wpdb->delete($audit_table, array('order_id' => $order_id), array('%d'));
+		$wpdb->delete($processing_table, array('order_id' => $order_id), array('%d'));
+		$wpdb->delete($archive_table, array('order_id' => $order_id), array('%d'));
+		$wpdb->delete($flags_table, array('order_id' => $order_id), array('%d'));
+
+		$wpdb->insert(
+			$audit_table,
+			array(
+				'event_type' => 'order_deleted_secure_bin',
+				'entity_type' => 'order',
+				'entity_id' => $order_id,
+				'order_id' => $order_id,
+				'actor_user_id' => $actor_user_id > 0 ? $actor_user_id : null,
+				'old_value_json' => wp_json_encode(array()),
+				'new_value_json' => wp_json_encode(
+					array(
+						'total' => round($total, 2),
+						'currency' => $currency,
+					)
+				),
+				'context_json' => wp_json_encode(
+					array(
+						'source' => 'secure_bin_delete',
+					)
+				),
+				'created_at_gmt' => gmdate('Y-m-d H:i:s'),
+			),
+			array('%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s')
+		);
 	}
 
 	private static function setSecureDeleteAuthorization(int $order_id, int $user_id): void
@@ -523,8 +568,8 @@ final class ArDesignOrderReviewGuard
 
 	public static function registerTenMinuteCron(array $schedules): array
 	{
-		if (! isset($schedules[self::CRON_RECURRENCE])) {
-			$schedules[self::CRON_RECURRENCE] = array('interval' => 10 * MINUTE_IN_SECONDS, 'display' => __('Every 10 Minutes', 'ar-design-order-review-guard'));
+		if (! isset($schedules[self::CRON_RECURRENCE_NAME])) {
+			$schedules[self::CRON_RECURRENCE_NAME] = array('interval' => 10 * MINUTE_IN_SECONDS, 'display' => __('Every 10 Minutes', 'ar-design-order-review-guard'));
 		}
 		return $schedules;
 	}
@@ -626,6 +671,6 @@ final class ArDesignOrderReviewGuard
 	}
 }
 
-ArDesignOrderReviewGuard::bootstrap();
-register_activation_hook(__FILE__, array('ArDesignOrderReviewGuard', 'activate'));
-register_deactivation_hook(__FILE__, array('ArDesignOrderReviewGuard', 'deactivate'));
+ArDesign\OrderReviewGuard\Application\Bootstrap::boot()->run();
+register_activation_hook(ARDRG_FILE, array('ArDesign\\OrderReviewGuard\\Application\\Bootstrap', 'activate'));
+register_deactivation_hook(ARDRG_FILE, array('ArDesign\\OrderReviewGuard\\Application\\Bootstrap', 'deactivate'));

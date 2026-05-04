@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AR Design Order Review Guard
  * Description: Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu.
- * Version: 0.2.9
+ * Version: 0.2.0
  * Author: AR Design
  * Update URI: https://github.com/Arpad70/ar-design-order-review-guard
  * Requires at least: 6.7
@@ -13,7 +13,7 @@ if (! defined('ABSPATH')) {
 	exit;
 }
 
-define('ARDRG_VERSION', '0.2.9');
+define('ARDRG_VERSION', '0.2.0');
 define('ARDRG_DB_VERSION', '0.2.0');
 define('ARDRG_FILE', __FILE__);
 define('ARDRG_BASENAME', plugin_basename(__FILE__));
@@ -209,7 +209,7 @@ final class ArDesignOrderReviewGuard
 		wp_nonce_field('ardrg_generate_secret');
 		echo '<p><label><strong>Manažerský e-mail</strong></label><br /><input type="email" class="regular-text" name="manager_email" value="' . esc_attr($manager_email) . '" required /></p>';
 		if ($secret_changed_at > 0) {
-			echo '<p><em>Poslední změna hesla: ' . esc_html(wp_date('Y-m-d H:i:s', $secret_changed_at)) . '</em></p>';
+			echo '<p><em>Poslední změna hesla: ' . esc_html(self::formatLocalDateTimeFromTimestamp($secret_changed_at)) . '</em></p>';
 		}
 		submit_button('Vygenerovat nové tajné heslo', 'primary', 'submit', false);
 		echo '</form>';
@@ -234,7 +234,7 @@ final class ArDesignOrderReviewGuard
 				$order_id = isset($row['order_id']) ? (int) $row['order_id'] : 0;
 				$actor_user_id = isset($row['actor_user_id']) ? (int) $row['actor_user_id'] : 0;
 				$context_json = isset($row['context_json']) ? (string) $row['context_json'] : '';
-				$local_time = '' !== $created_at ? wp_date('Y-m-d H:i:s', strtotime($created_at . ' UTC')) : '';
+				$local_time = '' !== $created_at ? self::formatLocalDateTimeFromGmtString($created_at) : '';
 				$user_label = $actor_user_id > 0 ? ('#' . $actor_user_id) : '—';
 				$user = $actor_user_id > 0 ? get_user_by('id', $actor_user_id) : false;
 				if ($user instanceof WP_User) {
@@ -363,7 +363,7 @@ final class ArDesignOrderReviewGuard
 		update_option(self::OPTION_SECRET_CHANGED_AT, time(), false);
 		self::audit('secret_generated', array('target_email' => $new_email), $user_id, null);
 
-		$mail_ok = wp_mail($new_email, 'AR Review Guard - nové tajné heslo', "Nové heslo: {$secret}\nVygenerováno: " . wp_date('Y-m-d H:i:s'));
+		$mail_ok = wp_mail($new_email, 'AR Review Guard - nové tajné heslo', "Nové heslo: {$secret}\nVygenerováno: " . self::formatLocalDateTimeFromTimestamp(time()));
 		wp_safe_redirect(admin_url('admin.php?page=ar-order-review-guard&ardrg_notice=' . ($mail_ok ? 'secret_generated' : 'secret_mail_failed')));
 		exit;
 	}
@@ -1186,6 +1186,21 @@ final class ArDesignOrderReviewGuard
 			}
 		}
 		return array('totals' => $totals, 'daily' => array());
+	}
+
+	private static function formatLocalDateTimeFromTimestamp(int $timestamp): string
+	{
+		$format = (string) (get_option('date_format') . ' ' . get_option('time_format'));
+		return wp_date($format, $timestamp);
+	}
+
+	private static function formatLocalDateTimeFromGmtString(string $gmt_datetime): string
+	{
+		$timestamp = strtotime($gmt_datetime . ' UTC');
+		if (false === $timestamp) {
+			return $gmt_datetime;
+		}
+		return self::formatLocalDateTimeFromTimestamp((int) $timestamp);
 	}
 }
 

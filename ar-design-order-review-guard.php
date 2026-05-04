@@ -2,8 +2,9 @@
 /**
  * Plugin Name: AR Design Order Review Guard
  * Description: Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu.
- * Version: 0.2.3
+ * Version: 0.2.4
  * Author: AR Design
+ * Update URI: https://github.com/Arpad70/ar-design-order-review-guard
  * Requires at least: 6.7
  * Requires PHP: 8.0
  */
@@ -12,10 +13,12 @@ if (! defined('ABSPATH')) {
 	exit;
 }
 
-define('ARDRG_VERSION', '0.2.3');
+define('ARDRG_VERSION', '0.2.4');
 define('ARDRG_DB_VERSION', '0.2.0');
 define('ARDRG_FILE', __FILE__);
+define('ARDRG_BASENAME', plugin_basename(__FILE__));
 define('ARDRG_PATH', plugin_dir_path(__FILE__));
+define('ARDRG_GITHUB_REPOSITORY', 'Arpad70/ar-design-order-review-guard');
 
 require_once ARDRG_PATH . 'bootstrap/autoload.php';
 ArDesign\OrderReviewGuard\Support\Autoloader::register();
@@ -264,7 +267,7 @@ final class ArDesignOrderReviewGuard
 
 		echo '<p><strong>' . esc_html__('Bezpečné vymazání objednávky', 'ar-design-order-review-guard') . '</strong></p>';
 		echo '<p>' . esc_html__('Objednávka bude archivována do Secure Bin tabulky a trvale smazána z WooCommerce.', 'ar-design-order-review-guard') . '</p>';
-		echo '<p><a class="button button-secondary" href="' . esc_url(self::getOrderSecureBinUrl($order_id)) . '">' . esc_html__('Otevřít Secure Bin formulář', 'ar-design-order-review-guard') . '</a></p>';
+		self::renderSecureBinInlineForm($order_id);
 	}
 
 	private static function getOrderSecureBinUrl(int $order_id): string
@@ -294,9 +297,21 @@ final class ArDesignOrderReviewGuard
 		$order_id = (int) $order->get_id();
 		echo '<div class="order_data_column" style="width:100%;padding-top:8px;">';
 		echo '<h4>' . esc_html__('AR Review Guard: Secure Bin', 'ar-design-order-review-guard') . '</h4>';
-		echo '<p>' . esc_html__('Objednávku lze trvale vymazat jen přes tajné heslo. Klikněte na tlačítko níže.', 'ar-design-order-review-guard') . '</p>';
-		echo '<p><a class="button button-secondary" href="' . esc_url(self::getOrderSecureBinUrl($order_id)) . '">' . esc_html__('Vymazat objednávku (Secure Bin)', 'ar-design-order-review-guard') . '</a></p>';
+		echo '<p>' . esc_html__('Objednávku lze trvale vymazat jen přes tajné heslo.', 'ar-design-order-review-guard') . '</p>';
+		self::renderSecureBinInlineForm($order_id);
 		echo '</div>';
+	}
+
+	private static function renderSecureBinInlineForm(int $order_id): void
+	{
+		echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin-top:8px;">';
+		echo '<input type="hidden" name="action" value="ardrg_secure_bin_order" />';
+		echo '<input type="hidden" name="order_id" value="' . esc_attr((string) $order_id) . '" />';
+		wp_nonce_field('ardrg_secure_bin_order_' . $order_id);
+		echo '<p><label><strong>' . esc_html__('Tajné heslo', 'ar-design-order-review-guard') . '</strong></label><br />';
+		echo '<input type="password" class="regular-text" name="manager_secret" required autocomplete="off" /></p>';
+		echo '<p><button type="submit" class="button button-primary" onclick="return confirm(\'Potvrdit trvalé vymazání objednávky?\');">' . esc_html__('Vymazat objednávku (Secure Bin)', 'ar-design-order-review-guard') . '</button></p>';
+		echo '</form>';
 	}
 
 	public static function handleSecureBinOrder(): void
@@ -317,6 +332,8 @@ final class ArDesignOrderReviewGuard
 			exit;
 		}
 
+		$product_summary = self::buildOrderProductsSummary($order);
+
 		if (! self::archiveOrderToSecureBin($order, $user_id)) {
 			self::audit('secure_bin_failed', array('reason' => 'archive_failed'), $user_id, $order_id);
 			wp_safe_redirect(admin_url('admin.php?page=ar-order-review-guard&ardrg_notice=secure_bin_error'));
@@ -336,6 +353,7 @@ final class ArDesignOrderReviewGuard
 			$order_id,
 			(float) $order->get_total(),
 			(string) $order->get_currency(),
+			$product_summary,
 			$user_id
 		);
 
@@ -344,7 +362,7 @@ final class ArDesignOrderReviewGuard
 		exit;
 	}
 
-	private static function purgeArDesignReportingTrailAndLogDelete(int $order_id, float $total, string $currency, int $actor_user_id): void
+	private static function purgeArDesignReportingTrailAndLogDelete(int $order_id, float $total, string $currency, array $product_summary, int $actor_user_id): void
 	{
 		global $wpdb;
 
@@ -359,7 +377,16 @@ final class ArDesignOrderReviewGuard
 		$flags_table = $prefix . 'ard_order_flags';
 
 		// Zmazanie predchádzajúcich audit/workflow stôp objednávky.
-		$wpdb->delete($audit_table, array('order_id' => $order_id), array('%d'));
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$audit_table}
+				WHERE order_id = %d
+				OR (entity_type = %s AND entity_id = %d)",
+				$order_id,
+				'order',
+				$order_id
+			)
+		);
 		$wpdb->delete($processing_table, array('order_id' => $order_id), array('%d'));
 		$wpdb->delete($archive_table, array('order_id' => $order_id), array('%d'));
 		$wpdb->delete($flags_table, array('order_id' => $order_id), array('%d'));
@@ -377,16 +404,49 @@ final class ArDesignOrderReviewGuard
 					array(
 						'total' => round($total, 2),
 						'currency' => $currency,
+						'product_ids' => $product_summary['product_ids'],
 					)
 				),
 				'context_json' => wp_json_encode(
 					array(
 						'source' => 'secure_bin_delete',
+						'products_summary' => $product_summary,
 					)
 				),
 				'created_at_gmt' => gmdate('Y-m-d H:i:s'),
 			),
 			array('%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s')
+		);
+	}
+
+	private static function buildOrderProductsSummary(WC_Order $order): array
+	{
+		$product_ids = array();
+		$items = array();
+
+		foreach ($order->get_items() as $item) {
+			if (! $item instanceof WC_Order_Item_Product) {
+				continue;
+			}
+
+			$product_id = (int) $item->get_product_id();
+			$variation_id = (int) $item->get_variation_id();
+			if ($product_id > 0) {
+				$product_ids[] = $product_id;
+			}
+
+			$items[] = array(
+				'product_id' => $product_id,
+				'variation_id' => $variation_id > 0 ? $variation_id : null,
+				'qty' => (int) $item->get_quantity(),
+			);
+		}
+
+		$product_ids = array_values(array_unique(array_filter($product_ids)));
+
+		return array(
+			'product_ids' => $product_ids,
+			'items' => $items,
 		);
 	}
 

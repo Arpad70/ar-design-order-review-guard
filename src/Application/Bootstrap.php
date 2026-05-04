@@ -6,6 +6,7 @@ namespace ArDesign\OrderReviewGuard\Application;
 
 use ArDesign\OrderReviewGuard\Infrastructure\Database\Migrator;
 use ArDesign\OrderReviewGuard\Infrastructure\Database\Schema;
+use ArDesign\OrderReviewGuard\Support\Updates\GitHubUpdater;
 
 final class Bootstrap
 {
@@ -13,11 +14,13 @@ final class Bootstrap
 
 	private Requirements $requirements;
 	private Migrator $migrator;
+	private GitHubUpdater $updater;
 
 	private function __construct()
 	{
 		$this->requirements = new Requirements();
 		$this->migrator = new Migrator(new Schema());
+		$this->updater = new GitHubUpdater(ARDRG_GITHUB_REPOSITORY, ARDRG_BASENAME, ARDRG_VERSION);
 	}
 
 	public static function boot(): self
@@ -42,6 +45,7 @@ final class Bootstrap
 			return;
 		}
 
+		$this->updater->register();
 		\ArDesignOrderReviewGuard::bootstrap();
 	}
 

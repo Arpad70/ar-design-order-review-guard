@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AR Design Order Review Guard
  * Description: Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu.
- * Version: 0.2.4
+ * Version: 0.2.5
  * Author: AR Design
  * Update URI: https://github.com/Arpad70/ar-design-order-review-guard
  * Requires at least: 6.7
@@ -13,7 +13,7 @@ if (! defined('ABSPATH')) {
 	exit;
 }
 
-define('ARDRG_VERSION', '0.2.4');
+define('ARDRG_VERSION', '0.2.5');
 define('ARDRG_DB_VERSION', '0.2.0');
 define('ARDRG_FILE', __FILE__);
 define('ARDRG_BASENAME', plugin_basename(__FILE__));
@@ -341,7 +341,7 @@ final class ArDesignOrderReviewGuard
 		}
 
 		self::setSecureDeleteAuthorization($order_id, $user_id);
-		$deleted = wc_delete_order($order_id, true);
+		$deleted = self::forceDeleteOrder($order_id, $order);
 		self::clearSecureDeleteAuthorization($order_id, $user_id);
 		if (! $deleted) {
 			self::audit('secure_bin_failed', array('reason' => 'delete_failed'), $user_id, $order_id);
@@ -360,6 +360,23 @@ final class ArDesignOrderReviewGuard
 		self::audit('secure_bin_success', array('status_before_delete' => self::STATUS_SLUG), $user_id, $order_id);
 		wp_safe_redirect(admin_url('admin.php?page=ar-order-review-guard&ardrg_notice=secure_bin_done'));
 		exit;
+	}
+
+	private static function forceDeleteOrder(int $order_id, WC_Order $order): bool
+	{
+		if (function_exists('wc_delete_order')) {
+			$result = wc_delete_order($order_id, true);
+			return ! empty($result);
+		}
+
+		if (method_exists($order, 'delete')) {
+			$order->delete(true);
+			$check = wc_get_order($order_id);
+			return ! $check instanceof WC_Order;
+		}
+
+		$result = wp_delete_post($order_id, true);
+		return ! empty($result);
 	}
 
 	private static function purgeArDesignReportingTrailAndLogDelete(int $order_id, float $total, string $currency, array $product_summary, int $actor_user_id): void

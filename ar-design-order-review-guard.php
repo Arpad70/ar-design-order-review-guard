@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AR Design Order Review Guard
  * Description: Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu.
- * Version: 0.2.7
+ * Version: 0.2.8
  * Author: AR Design
  * Update URI: https://github.com/Arpad70/ar-design-order-review-guard
  * Requires at least: 6.7
@@ -13,7 +13,7 @@ if (! defined('ABSPATH')) {
 	exit;
 }
 
-define('ARDRG_VERSION', '0.2.7');
+define('ARDRG_VERSION', '0.2.8');
 define('ARDRG_DB_VERSION', '0.2.0');
 define('ARDRG_FILE', __FILE__);
 define('ARDRG_BASENAME', plugin_basename(__FILE__));
@@ -38,15 +38,19 @@ final class ArDesignOrderReviewGuard
 	private const SECURE_BIN_TABLE = 'ardrg_secure_bin_orders';
 	private const AUDIT_TABLE = 'ardrg_secure_bin_audit';
 	private const SECURE_DELETE_TOKEN_PREFIX = 'ardrg_secure_delete_';
+	private const META_MANUAL_REVIEW_SEEN = '_ardrg_manual_review_seen';
+	private const META_MANUAL_REVIEW_RETURNED = '_ardrg_manual_review_returned';
 
 	public static function bootstrap(): void
 	{
 		add_action('init', array(__CLASS__, 'registerStatus'));
 		add_action('admin_menu', array(__CLASS__, 'registerAdminReportPage'), 99);
+		add_action('admin_notices', array(__CLASS__, 'renderGlobalBulkNotices'));
 		add_action('add_meta_boxes', array(__CLASS__, 'registerOrderMetaBox'));
 		add_action('woocommerce_admin_order_data_after_order_details', array(__CLASS__, 'renderOrderEditInlinePanel'));
 		add_action('admin_post_ardrg_generate_secret', array(__CLASS__, 'handleGenerateSecret'));
 		add_action('admin_post_ardrg_secure_bin_order', array(__CLASS__, 'handleSecureBinOrder'));
+		add_action('admin_post_ardrg_bulk_secure_bin_orders', array(__CLASS__, 'handleBulkSecureBinOrders'));
 
 		add_filter('wc_order_statuses', array(__CLASS__, 'registerStatusInLists'));
 		add_filter('bulk_actions-edit-shop_order', array(__CLASS__, 'registerBulkAction'));
@@ -57,6 +61,7 @@ final class ArDesignOrderReviewGuard
 
 		add_filter('woocommerce_can_reduce_order_stock', array(__CLASS__, 'blockStockReductionForManualReview'), 10, 2);
 		add_action('woocommerce_order_status_changed', array(__CLASS__, 'releaseStockOnManualReviewTransition'), 20, 4);
+		add_action('woocommerce_order_status_changed', array(__CLASS__, 'trackManualReviewLifecycleFlags'), 30, 4);
 		add_action('woocommerce_loaded', array(__CLASS__, 'disableWooAutoCancelUnpaid'), 30);
 
 		add_filter('cron_schedules', array(__CLASS__, 'registerTenMinuteCron'));
@@ -103,11 +108,30 @@ final class ArDesignOrderReviewGuard
 	public static function registerBulkAction(array $actions): array
 	{
 		$actions['mark_' . self::STATUS_SLUG] = __('Změnit na Manuální kontrola', 'ar-design-order-review-guard');
+		$actions['ardrg_bulk_secure_bin'] = __('Secure Bin: Vymazat označené (tajné heslo)', 'ar-design-order-review-guard');
 		return $actions;
 	}
 
 	public static function handleBulkAction(string $redirect_to, string $action, array $ids): string
 	{
+		if ('ardrg_bulk_secure_bin' === $action) {
+			$order_ids = array_values(array_unique(array_map('absint', $ids)));
+			$order_ids = array_values(array_filter($order_ids));
+			if (empty($order_ids)) {
+				return add_query_arg('ardrg_bulk_marked', '0', $redirect_to);
+			}
+
+			return add_query_arg(
+				array(
+					'page' => 'ar-order-review-guard',
+					'ardrg_bulk_secure_bin' => '1',
+					'ardrg_order_ids' => implode(',', $order_ids),
+					'ardrg_return_to' => rawurlencode($redirect_to),
+				),
+				admin_url('admin.php')
+			);
+		}
+
 		if ('mark_' . self::STATUS_SLUG !== $action) {
 			return $redirect_to;
 		}
@@ -177,6 +201,7 @@ final class ArDesignOrderReviewGuard
 		echo '<div class="wrap"><h1>AR Order Review Guard</h1>';
 		self::renderAdminNotices();
 		self::renderSecureBinFormIfRequested();
+		self::renderBulkSecureBinFormIfRequested();
 
 		echo '<h2>Secure Bin nastavení</h2>';
 		echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="max-width:760px;background:#fff;padding:16px;border:1px solid #ccd0d4;">';
@@ -271,11 +296,6 @@ final class ArDesignOrderReviewGuard
 
 	private static function renderAdminNotices(): void
 	{
-		if (isset($_GET['ardrg_bulk_marked'])) {
-			$count = absint((string) wp_unslash($_GET['ardrg_bulk_marked']));
-			echo '<div class="notice notice-success"><p>' . esc_html(sprintf('Hromadně přesunuto do Manuální kontroly: %d objednávek.', $count)) . '</p></div>';
-		}
-
 		if (! isset($_GET['ardrg_notice'])) {
 			return;
 		}
@@ -291,6 +311,32 @@ final class ArDesignOrderReviewGuard
 			return;
 		}
 		echo '<div class="notice notice-' . esc_attr($map[$notice][0]) . '"><p>' . esc_html($map[$notice][1]) . '</p></div>';
+	}
+
+	public static function renderGlobalBulkNotices(): void
+	{
+		if (! current_user_can('manage_woocommerce')) {
+			return;
+		}
+
+		if (isset($_GET['ardrg_bulk_marked'])) {
+			$count = absint((string) wp_unslash($_GET['ardrg_bulk_marked']));
+			echo '<div class="notice notice-success"><p>' . esc_html(sprintf('Hromadně přesunuto do Manuální kontroly: %d objednávek.', $count)) . '</p></div>';
+		}
+
+		if (isset($_GET['ardrg_bulk_secure_processed']) || isset($_GET['ardrg_bulk_secure_deleted']) || isset($_GET['ardrg_bulk_secure_failed'])) {
+			$processed = absint((string) wp_unslash($_GET['ardrg_bulk_secure_processed'] ?? '0'));
+			$deleted = absint((string) wp_unslash($_GET['ardrg_bulk_secure_deleted'] ?? '0'));
+			$failed = absint((string) wp_unslash($_GET['ardrg_bulk_secure_failed'] ?? '0'));
+			$message = sprintf(
+				'Hromadné Secure Bin: zpracováno %d, smazáno %d, selhalo %d.',
+				$processed,
+				$deleted,
+				$failed
+			);
+			$class = $failed > 0 ? 'warning' : 'success';
+			echo '<div class="notice notice-' . esc_attr($class) . '"><p>' . esc_html($message) . '</p></div>';
+		}
 	}
 
 	public static function handleGenerateSecret(): void
@@ -344,6 +390,37 @@ final class ArDesignOrderReviewGuard
 		wp_nonce_field('ardrg_secure_bin_order_' . $order_id);
 		echo '<p><label><strong>Tajné heslo</strong></label><br /><input type="password" class="regular-text" name="manager_secret" required autocomplete="off" /></p>';
 		submit_button('Potvrdit Secure Bin', 'delete');
+		echo '</form>';
+	}
+
+	private static function renderBulkSecureBinFormIfRequested(): void
+	{
+		if (! isset($_GET['ardrg_bulk_secure_bin']) || '1' !== (string) wp_unslash($_GET['ardrg_bulk_secure_bin'])) {
+			return;
+		}
+
+		$order_ids_raw = isset($_GET['ardrg_order_ids']) ? (string) wp_unslash($_GET['ardrg_order_ids']) : '';
+		$order_ids = array_values(array_filter(array_map('absint', explode(',', $order_ids_raw))));
+		if (empty($order_ids)) {
+			echo '<div class="notice notice-error"><p>Nebyly vybrány žádné objednávky.</p></div>';
+			return;
+		}
+
+		$return_to = isset($_GET['ardrg_return_to']) ? rawurldecode((string) wp_unslash($_GET['ardrg_return_to'])) : '';
+		$return_to = self::sanitizeOrdersListReturnUrl($return_to);
+
+		echo '<div class="notice notice-warning"><p>';
+		echo 'Hromadné Secure Bin vymazání pro ' . esc_html((string) count($order_ids)) . ' objednávek. ';
+		echo 'Budou vymazány jen objednávky ve stavu Manuální kontrola a jen při správném tajném hesle.';
+		echo '</p></div>';
+
+		echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="max-width:760px;background:#fff;padding:16px;border:1px solid #ccd0d4;margin-bottom:16px;">';
+		echo '<input type="hidden" name="action" value="ardrg_bulk_secure_bin_orders" />';
+		echo '<input type="hidden" name="order_ids" value="' . esc_attr(implode(',', $order_ids)) . '" />';
+		echo '<input type="hidden" name="return_to" value="' . esc_attr($return_to) . '" />';
+		wp_nonce_field('ardrg_bulk_secure_bin_orders');
+		echo '<p><label><strong>Tajné heslo</strong></label><br /><input type="password" class="regular-text" name="manager_secret" required autocomplete="off" /></p>';
+		submit_button('Potvrdit hromadné Secure Bin vymazání', 'delete');
 		echo '</form>';
 	}
 
@@ -477,6 +554,77 @@ final class ArDesignOrderReviewGuard
 
 		self::audit('secure_bin_success', array('status_before_delete' => self::STATUS_SLUG), $user_id, $order_id);
 		wp_safe_redirect(self::buildPostSecureBinRedirectUrl('secure_bin_done', $return_to));
+		exit;
+	}
+
+	public static function handleBulkSecureBinOrders(): void
+	{
+		if (! current_user_can('manage_woocommerce')) {
+			wp_die('Forbidden');
+		}
+		check_admin_referer('ardrg_bulk_secure_bin_orders');
+
+		$user_id = get_current_user_id();
+		$return_to = (string) wp_unslash($_POST['return_to'] ?? '');
+		$order_ids_raw = (string) wp_unslash($_POST['order_ids'] ?? '');
+		$order_ids = array_values(array_filter(array_map('absint', explode(',', $order_ids_raw))));
+
+		$secret = trim((string) wp_unslash($_POST['manager_secret'] ?? ''));
+		$hash = (string) get_option(self::OPTION_SECRET_HASH, '');
+		if ('' === $hash || ! wp_check_password($secret, $hash)) {
+			wp_safe_redirect(self::buildPostSecureBinRedirectUrl('secure_bin_wrong_secret', $return_to));
+			exit;
+		}
+
+		$processed = 0;
+		$deleted = 0;
+		$failed = 0;
+
+		foreach ($order_ids as $order_id) {
+			$order = wc_get_order($order_id);
+			if (! $order instanceof WC_Order || self::STATUS_SLUG !== $order->get_status()) {
+				continue;
+			}
+
+			$processed++;
+			$product_summary = self::buildOrderProductsSummary($order);
+			if (! self::archiveOrderToSecureBin($order, $user_id)) {
+				self::audit('secure_bin_failed', array('reason' => 'archive_failed_bulk'), $user_id, $order_id);
+				$failed++;
+				continue;
+			}
+
+			self::setSecureDeleteAuthorization($order_id, $user_id);
+			$did_delete = self::forceDeleteOrder($order_id, $order);
+			self::clearSecureDeleteAuthorization($order_id, $user_id);
+
+			if (! $did_delete) {
+				self::audit('secure_bin_failed', array('reason' => 'delete_failed_bulk'), $user_id, $order_id);
+				$failed++;
+				continue;
+			}
+
+			self::purgeArDesignReportingTrailAndLogDelete(
+				$order_id,
+				(float) $order->get_total(),
+				(string) $order->get_currency(),
+				$product_summary,
+				$user_id
+			);
+			self::audit('secure_bin_success', array('status_before_delete' => self::STATUS_SLUG, 'bulk' => true), $user_id, $order_id);
+			$deleted++;
+		}
+
+		$target = self::sanitizeOrdersListReturnUrl($return_to);
+		$target = add_query_arg(
+			array(
+				'ardrg_bulk_secure_processed' => (string) $processed,
+				'ardrg_bulk_secure_deleted' => (string) $deleted,
+				'ardrg_bulk_secure_failed' => (string) $failed,
+			),
+			$target
+		);
+		wp_safe_redirect($target);
 		exit;
 	}
 
@@ -847,6 +995,9 @@ final class ArDesignOrderReviewGuard
 			if (! $order instanceof WC_Order || $order->is_paid() || self::STATUS_SLUG === $order->get_status()) {
 				continue;
 			}
+			if (self::isManualReviewReturnProtected($order)) {
+				continue;
+			}
 			$risk = self::evaluateOrderRisk($order);
 			$threshold = self::resolveRiskThreshold($order);
 			if ($risk['score'] < $threshold) {
@@ -857,6 +1008,36 @@ final class ArDesignOrderReviewGuard
 				wc_release_stock_for_order($order);
 			}
 		}
+	}
+
+	public static function trackManualReviewLifecycleFlags(int $order_id, string $from, string $to, $order): void
+	{
+		if (! $order instanceof WC_Order) {
+			$order = wc_get_order($order_id);
+		}
+		if (! $order instanceof WC_Order) {
+			return;
+		}
+
+		if (self::STATUS_SLUG === $to) {
+			$order->update_meta_data(self::META_MANUAL_REVIEW_SEEN, '1');
+			$order->save_meta_data();
+			return;
+		}
+
+		if (self::STATUS_SLUG === $from && self::STATUS_SLUG !== $to) {
+			$order->update_meta_data(self::META_MANUAL_REVIEW_SEEN, '1');
+			$order->update_meta_data(self::META_MANUAL_REVIEW_RETURNED, '1');
+			$order->update_meta_data(self::META_MANUAL_REVIEW_RETURNED . '_at_gmt', gmdate('Y-m-d H:i:s'));
+			$order->save_meta_data();
+		}
+	}
+
+	private static function isManualReviewReturnProtected(WC_Order $order): bool
+	{
+		$seen = (string) $order->get_meta(self::META_MANUAL_REVIEW_SEEN, true);
+		$returned = (string) $order->get_meta(self::META_MANUAL_REVIEW_RETURNED, true);
+		return ('1' === $seen) && ('1' === $returned);
 	}
 
 	private static function evaluateOrderRisk(WC_Order $order): array

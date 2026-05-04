@@ -32,6 +32,8 @@ final class ArDesignOrderReviewGuard
 	{
 		add_action('init', array(__CLASS__, 'registerStatus'));
 		add_action('admin_menu', array(__CLASS__, 'registerAdminReportPage'), 99);
+		add_action('add_meta_boxes', array(__CLASS__, 'registerOrderMetaBox'));
+		add_action('woocommerce_admin_order_data_after_order_details', array(__CLASS__, 'renderOrderEditInlinePanel'));
 		add_action('admin_post_ardrg_generate_secret', array(__CLASS__, 'handleGenerateSecret'));
 		add_action('admin_post_ardrg_secure_bin_order', array(__CLASS__, 'handleSecureBinOrder'));
 
@@ -122,7 +124,7 @@ final class ArDesignOrderReviewGuard
 		}
 
 		$actions['ardrg_secure_bin'] = array(
-			'url' => wp_nonce_url(admin_url('admin.php?page=ar-order-review-guard&secure_bin_order_id=' . $order->get_id()), 'ardrg_secure_bin_form_' . $order->get_id()),
+			'url' => self::getOrderSecureBinUrl((int) $order->get_id()),
 			'name' => __('Secure Bin', 'ar-design-order-review-guard'),
 			'action' => 'trash',
 		);
@@ -240,6 +242,69 @@ final class ArDesignOrderReviewGuard
 		echo '<p><label><strong>Tajné heslo</strong></label><br /><input type="password" class="regular-text" name="manager_secret" required autocomplete="off" /></p>';
 		submit_button('Potvrdit Secure Bin', 'delete');
 		echo '</form>';
+	}
+
+	public static function registerOrderMetaBox(): void
+	{
+		add_meta_box(
+			'ardrg-secure-bin',
+			__('AR Review Guard: Secure Bin', 'ar-design-order-review-guard'),
+			array(__CLASS__, 'renderOrderMetaBox'),
+			'shop_order',
+			'side',
+			'high'
+		);
+	}
+
+	public static function renderOrderMetaBox(\WP_Post $post): void
+	{
+		$order_id = (int) $post->ID;
+		$order = wc_get_order($order_id);
+		if (! $order instanceof WC_Order) {
+			echo '<p>' . esc_html__('Objednávka nebyla načtena.', 'ar-design-order-review-guard') . '</p>';
+			return;
+		}
+
+		if (self::STATUS_SLUG !== $order->get_status()) {
+			echo '<p>' . esc_html__('Tlačítko je dostupné jen pro stav Manuální kontrola.', 'ar-design-order-review-guard') . '</p>';
+			return;
+		}
+
+		echo '<p><strong>' . esc_html__('Bezpečné vymazání objednávky', 'ar-design-order-review-guard') . '</strong></p>';
+		echo '<p>' . esc_html__('Objednávka bude archivována do Secure Bin tabulky a trvale smazána z WooCommerce.', 'ar-design-order-review-guard') . '</p>';
+		echo '<p><a class="button button-secondary" href="' . esc_url(self::getOrderSecureBinUrl($order_id)) . '">' . esc_html__('Otevřít Secure Bin formulář', 'ar-design-order-review-guard') . '</a></p>';
+	}
+
+	private static function getOrderSecureBinUrl(int $order_id): string
+	{
+		$order_id = absint($order_id);
+		$nonce = wp_create_nonce('ardrg_secure_bin_form_' . $order_id);
+		$page_url = admin_url('admin.php?page=ar-order-review-guard&secure_bin_order_id=' . $order_id . '&_wpnonce=' . $nonce);
+
+		// HPOS order edit url fallback.
+		$hpos_url = admin_url('admin.php?page=wc-orders&action=edit&id=' . $order_id . '&ardrg_secure_bin_order_id=' . $order_id . '&ardrg_secure_bin_nonce=' . $nonce);
+
+		if (isset($_GET['page']) && 'wc-orders' === (string) $_GET['page']) {
+			return $hpos_url;
+		}
+
+		return $page_url;
+	}
+
+	public static function renderOrderEditInlinePanel($order): void
+	{
+		if (! $order instanceof WC_Order) {
+			return;
+		}
+		if (self::STATUS_SLUG !== $order->get_status()) {
+			return;
+		}
+		$order_id = (int) $order->get_id();
+		echo '<div class="order_data_column" style="width:100%;padding-top:8px;">';
+		echo '<h4>' . esc_html__('AR Review Guard: Secure Bin', 'ar-design-order-review-guard') . '</h4>';
+		echo '<p>' . esc_html__('Objednávku lze trvale vymazat jen přes tajné heslo. Klikněte na tlačítko níže.', 'ar-design-order-review-guard') . '</p>';
+		echo '<p><a class="button button-secondary" href="' . esc_url(self::getOrderSecureBinUrl($order_id)) . '">' . esc_html__('Vymazat objednávku (Secure Bin)', 'ar-design-order-review-guard') . '</a></p>';
+		echo '</div>';
 	}
 
 	public static function handleSecureBinOrder(): void
@@ -564,4 +629,3 @@ final class ArDesignOrderReviewGuard
 ArDesignOrderReviewGuard::bootstrap();
 register_activation_hook(__FILE__, array('ArDesignOrderReviewGuard', 'activate'));
 register_deactivation_hook(__FILE__, array('ArDesignOrderReviewGuard', 'deactivate'));
-

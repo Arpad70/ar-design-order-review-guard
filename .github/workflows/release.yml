@@ -28,6 +28,23 @@ jobs:
           VERSION="$(cat VERSION)"
           if [ "${TAG}" != "v${VERSION}" ]; then
             echo "Tag ${TAG} does not match VERSION ${VERSION}"
+            {
+              echo "## Release Blocked: Version Mismatch"
+              echo ""
+              echo "- Git tag: \`${TAG}\`"
+              echo "- VERSION file: \`${VERSION}\`"
+              echo ""
+              echo "The release was intentionally blocked because tag and VERSION must match."
+              echo ""
+              echo "### How to fix"
+              echo "1. Update plugin version metadata and \`VERSION\` to the same value."
+              echo "2. Commit the fix to \`main\`."
+              echo "3. Create and push the matching tag again."
+              echo ""
+              echo "Expected rule:"
+              echo "- tag \`vX.Y.Z\`"
+              echo "- \`VERSION\` file \`X.Y.Z\`"
+            } >> \"$GITHUB_STEP_SUMMARY\"
             exit 1
           fi
 

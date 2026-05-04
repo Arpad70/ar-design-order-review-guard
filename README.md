@@ -84,3 +84,7 @@ Obsah:
 - celkový počet objednávek ve stavu `Manuální kontrola`
 - rozpad na noční (`22:00-06:00`) a denní (`06:00-22:00`)
 - trend za posledních 14 dní (denně: night/day/total)
+
+## Release checklist
+- Povinný post-release checklist je v souboru `RELEASE_CHECKLIST.md`.
+- Před každým vydáním musí být checklist kompletně projitý a potvrzený.

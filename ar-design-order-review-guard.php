@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AR Design Order Review Guard
  * Description: Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu.
- * Version: 0.2.11
+ * Version: 0.2.12
  * Author: AR Design
  * Update URI: https://github.com/Arpad70/ar-design-order-review-guard
  * Requires at least: 6.7
@@ -13,7 +13,7 @@ if (! defined('ABSPATH')) {
 	exit;
 }
 
-define('ARDRG_VERSION', '0.2.11');
+define('ARDRG_VERSION', '0.2.12');
 define('ARDRG_DB_VERSION', '0.2.0');
 define('ARDRG_FILE', __FILE__);
 define('ARDRG_BASENAME', plugin_basename(__FILE__));

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AR Design Order Review Guard
  * Description: Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu.
- * Version: 0.2.5
+ * Version: 0.2.6
  * Author: AR Design
  * Update URI: https://github.com/Arpad70/ar-design-order-review-guard
  * Requires at least: 6.7
@@ -13,7 +13,7 @@ if (! defined('ABSPATH')) {
 	exit;
 }
 
-define('ARDRG_VERSION', '0.2.5');
+define('ARDRG_VERSION', '0.2.6');
 define('ARDRG_DB_VERSION', '0.2.0');
 define('ARDRG_FILE', __FILE__);
 define('ARDRG_BASENAME', plugin_basename(__FILE__));
@@ -140,6 +140,7 @@ final class ArDesignOrderReviewGuard
 		$manager_email = (string) get_option(self::OPTION_MANAGER_EMAIL, get_option('admin_email'));
 		$secret_changed_at = (int) get_option(self::OPTION_SECRET_CHANGED_AT, 0);
 		$stats = self::collectManualReviewStats();
+		$recent_ops = self::getRecentSecureBinOperations(30);
 
 		echo '<div class="wrap"><h1>AR Order Review Guard</h1>';
 		self::renderAdminNotices();
@@ -163,7 +164,77 @@ final class ArDesignOrderReviewGuard
 		echo '<tr><td>Denní (06:00-22:00)</td><td>' . esc_html((string) $stats['totals']['day']) . '</td></tr>';
 		echo '</tbody></table>';
 
+		echo '<h2 style="margin-top:24px;">Poslední Secure Bin operace</h2>';
+		if (empty($recent_ops)) {
+			echo '<p>Žádné záznamy zatím nejsou k dispozici.</p>';
+		} else {
+			echo '<table class="widefat striped" style="max-width:1200px;"><thead><tr>';
+			echo '<th>Čas</th><th>Událost</th><th>Objednávka</th><th>Uživatel</th><th>Detail</th>';
+			echo '</tr></thead><tbody>';
+			foreach ($recent_ops as $row) {
+				$created_at = isset($row['created_at_gmt']) ? (string) $row['created_at_gmt'] : '';
+				$event_type = isset($row['event_type']) ? (string) $row['event_type'] : '';
+				$order_id = isset($row['order_id']) ? (int) $row['order_id'] : 0;
+				$actor_user_id = isset($row['actor_user_id']) ? (int) $row['actor_user_id'] : 0;
+				$context_json = isset($row['context_json']) ? (string) $row['context_json'] : '';
+				$local_time = '' !== $created_at ? wp_date('Y-m-d H:i:s', strtotime($created_at . ' UTC')) : '';
+				$user_label = $actor_user_id > 0 ? ('#' . $actor_user_id) : '—';
+				$user = $actor_user_id > 0 ? get_user_by('id', $actor_user_id) : false;
+				if ($user instanceof WP_User) {
+					$user_label = '#' . $actor_user_id . ' (' . $user->user_login . ')';
+				}
+
+				$detail = '';
+				if ('' !== $context_json) {
+					$context = json_decode($context_json, true);
+					if (is_array($context)) {
+						if (isset($context['reason'])) {
+							$detail = 'reason: ' . (string) $context['reason'];
+						} elseif (isset($context['status_before_delete'])) {
+							$detail = 'status_before_delete: ' . (string) $context['status_before_delete'];
+						}
+					}
+				}
+
+				echo '<tr>';
+				echo '<td>' . esc_html($local_time) . '</td>';
+				echo '<td><code>' . esc_html($event_type) . '</code></td>';
+				echo '<td>' . ($order_id > 0 ? ('#' . esc_html((string) $order_id)) : '—') . '</td>';
+				echo '<td>' . esc_html($user_label) . '</td>';
+				echo '<td>' . esc_html($detail) . '</td>';
+				echo '</tr>';
+			}
+			echo '</tbody></table>';
+		}
+
 		echo '</div>';
+	}
+
+	/**
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function getRecentSecureBinOperations(int $limit = 30): array
+	{
+		global $wpdb;
+		$table = $wpdb->prefix . self::AUDIT_TABLE;
+		$limit = max(1, min(200, $limit));
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, event_type, order_id, actor_user_id, context_json, created_at_gmt
+				FROM {$table}
+				WHERE event_type IN (%s, %s, %s)
+				ORDER BY id DESC
+				LIMIT %d",
+				'secure_bin_success',
+				'secure_bin_failed',
+				'secret_generated',
+				$limit
+			),
+			ARRAY_A
+		);
+
+		return is_array($rows) ? $rows : array();
 	}
 
 	private static function renderAdminNotices(): void

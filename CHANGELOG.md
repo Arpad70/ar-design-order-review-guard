@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.2.0
-- Added bootstrap/runtime split with autoloader.
-- Added requirements gate for WordPress, PHP and WooCommerce.
-- Added schema migrator with DB version tracking (`ardrg_db_version`).
-- Added plugin version tracking (`ardrg_version`).
-- Added explicit uninstall policy (`uninstall.php`, data retained by default).
+## 0.2.11
+- Corrected release version metadata in plugin header and constants.
+- Includes latest Secure Bin workflow improvements and localized datetime rendering updates.
+
+## 0.2.10
+- Superseded by 0.2.11 due to incorrect embedded version metadata.

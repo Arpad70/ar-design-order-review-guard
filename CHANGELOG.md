@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.14 - 2026-05-12
+- opraven fatální pád pluginu při načítání adminu způsobený chybějícím `RollbackManager.php`
+- rollback manager je nyní dostupný ve stejném namespace jako update infrastruktura
+
 ## 0.2.13 - 2026-05-04
 - v přehledu manuální kontroly přidán popisek s posledním dokončeným během WP CRON
 - v závorce se zobrazuje další plánované spuštění CRON hooku `ar_design_move_unpaid_to_manual_review`

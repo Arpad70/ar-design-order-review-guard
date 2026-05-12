@@ -1,0 +1,101 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: AR Design Order Review Guard 0.2.14\n"
+"Language: sk_SK\n"
+"Language-Team: Slovenčina\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=( n == 1 ) ? 0 : ( n >= 2 && n <= 4 ) ? 1 : 2;\n"
+"X-Domain: ar-design-order-review-guard\n"
+
+msgid "AR Design Order Review Guard"
+msgstr "AR Design Order Review Guard"
+
+msgid "Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu."
+msgstr "Nahrádza automatické rušenie nezaplatených objednávok bezpečným medzistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu."
+
+msgid "AR Design"
+msgstr "AR Design"
+
+msgctxt "Order status"
+msgid "Manuální kontrola"
+msgstr "Manuálna kontrola"
+
+msgid "Manuální kontrola <span class=\"count\">(%s)</span>"
+msgid_plural "Manuální kontrola <span class=\"count\">(%s)</span>"
+msgstr[0] "Manuálna kontrola <span class=\"count\">(%s)</span>"
+msgstr[1] "Manuálna kontrola <span class=\"count\">(%s)</span>"
+msgstr[2] "Manuálna kontrola <span class=\"count\">(%s)</span>"
+
+msgid "Manuální kontrola"
+msgstr "Manuálna kontrola"
+
+msgid "Změnit na Manuální kontrola"
+msgstr "Zmeniť na Manuálnu kontrolu"
+
+msgid "Secure Bin: Vymazat označené (tajné heslo)"
+msgstr "Secure Bin: Vymazať označené (tajné heslo)"
+
+msgid "Hromadná akce: přesun do Manuální kontroly."
+msgstr "Hromadná akcia: presun do Manuálnej kontroly."
+
+msgid "Secure Bin"
+msgstr "Secure Bin"
+
+msgid "AR Order Review Guard"
+msgstr "AR Order Review Guard"
+
+msgid "AR Review Guard"
+msgstr "AR Review Guard"
+
+msgid "Nedostatečná oprávnění."
+msgstr "Nedostatočné oprávnenia."
+
+msgid "AR Review Guard: Secure Bin"
+msgstr "AR Review Guard: Secure Bin"
+
+msgid "Objednávka nebyla načtena."
+msgstr "Objednávku sa nepodarilo načítať."
+
+msgid "Tlačítko je dostupné jen pro stav Manuální kontrola."
+msgstr "Tlačidlo je dostupné len pre stav Manuálna kontrola."
+
+msgid "Bezpečné vymazání objednávky"
+msgstr "Bezpečné vymazanie objednávky"
+
+msgid "Objednávka bude archivována do Secure Bin tabulky a trvale smazána z WooCommerce."
+msgstr "Objednávka bude archivovaná do tabuľky Secure Bin a natrvalo vymazaná z WooCommerce."
+
+msgid "Objednávku lze trvale vymazat jen přes tajné heslo."
+msgstr "Objednávku možno natrvalo vymazať len pomocou tajného hesla."
+
+msgid "Tajné heslo"
+msgstr "Tajné heslo"
+
+msgid "Vymazat objednávku (Secure Bin)"
+msgstr "Vymazať objednávku (Secure Bin)"
+
+msgid "Every 10 Minutes"
+msgstr "Každých 10 minút"
+
+msgid "zatím neproběhlo"
+msgstr "zatiaľ neprebehlo"
+
+msgid "nenaplánováno"
+msgstr "nenaplánované"
+
+msgid "Plugin AR Design Order Review Guard vyžaduje PHP 8.0 nebo novější."
+msgstr "Plugin AR Design Order Review Guard vyžaduje PHP 8.0 alebo novšie."
+
+msgid "Plugin AR Design Order Review Guard vyžaduje WordPress %s nebo novější."
+msgstr "Plugin AR Design Order Review Guard vyžaduje WordPress %s alebo novší."
+
+msgid "Plugin AR Design Order Review Guard vyžaduje aktivní WooCommerce."
+msgstr "Plugin AR Design Order Review Guard vyžaduje aktívny WooCommerce."
+
+msgid "Order review guard with secure bin workflow for WooCommerce."
+msgstr "Order review guard so Secure Bin workflow pre WooCommerce."
+
+msgid "Changelog není dostupný."
+msgstr "Zoznam zmien nie je dostupný."

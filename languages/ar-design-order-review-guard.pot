@@ -1,0 +1,143 @@
+# Copyright (C) 2026 AR Design
+# This file is distributed under the same license as the AR Design Order Review Guard plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: AR Design Order Review Guard 0.2.14\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/ar-design-order-review-guard\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-05-12T15:09:01+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: ar-design-order-review-guard\n"
+
+#. Plugin Name of the plugin
+#: ar-design-order-review-guard.php
+msgid "AR Design Order Review Guard"
+msgstr ""
+
+#. Description of the plugin
+#: ar-design-order-review-guard.php
+msgid "Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu."
+msgstr ""
+
+#. Author of the plugin
+#: ar-design-order-review-guard.php
+msgid "AR Design"
+msgstr ""
+
+#: ar-design-order-review-guard.php:85
+msgctxt "Order status"
+msgid "Manuální kontrola"
+msgstr ""
+
+#: ar-design-order-review-guard.php:90
+#, php-format
+msgid "Manuální kontrola <span class=\"count\">(%s)</span>"
+msgid_plural "Manuální kontrola <span class=\"count\">(%s)</span>"
+msgstr[0] ""
+msgstr[1] ""
+
+#: ar-design-order-review-guard.php:102
+#: ar-design-order-review-guard.php:107
+#: ar-design-order-review-guard.php:174
+msgid "Manuální kontrola"
+msgstr ""
+
+#: ar-design-order-review-guard.php:114
+msgid "Změnit na Manuální kontrola"
+msgstr ""
+
+#: ar-design-order-review-guard.php:115
+msgid "Secure Bin: Vymazat označené (tajné heslo)"
+msgstr ""
+
+#: ar-design-order-review-guard.php:159
+msgid "Hromadná akce: přesun do Manuální kontroly."
+msgstr ""
+
+#: ar-design-order-review-guard.php:182
+msgid "Secure Bin"
+msgstr ""
+
+#: ar-design-order-review-guard.php:191
+msgid "AR Order Review Guard"
+msgstr ""
+
+#: ar-design-order-review-guard.php:191
+msgid "AR Review Guard"
+msgstr ""
+
+#: ar-design-order-review-guard.php:197
+msgid "Nedostatečná oprávnění."
+msgstr ""
+
+#: ar-design-order-review-guard.php:435
+#: ar-design-order-review-guard.php:495
+msgid "AR Review Guard: Secure Bin"
+msgstr ""
+
+#: ar-design-order-review-guard.php:448
+msgid "Objednávka nebyla načtena."
+msgstr ""
+
+#: ar-design-order-review-guard.php:453
+msgid "Tlačítko je dostupné jen pro stav Manuální kontrola."
+msgstr ""
+
+#: ar-design-order-review-guard.php:457
+msgid "Bezpečné vymazání objednávky"
+msgstr ""
+
+#: ar-design-order-review-guard.php:458
+msgid "Objednávka bude archivována do Secure Bin tabulky a trvale smazána z WooCommerce."
+msgstr ""
+
+#: ar-design-order-review-guard.php:496
+msgid "Objednávku lze trvale vymazat jen přes tajné heslo."
+msgstr ""
+
+#: ar-design-order-review-guard.php:509
+msgid "Tajné heslo"
+msgstr ""
+
+#: ar-design-order-review-guard.php:511
+msgid "Vymazat objednávku (Secure Bin)"
+msgstr ""
+
+#: ar-design-order-review-guard.php:1061
+msgid "Every 10 Minutes"
+msgstr ""
+
+#: ar-design-order-review-guard.php:1219
+msgid "zatím neproběhlo"
+msgstr ""
+
+#: ar-design-order-review-guard.php:1222
+msgid "nenaplánováno"
+msgstr ""
+
+#: src/Application/Requirements.php:37
+msgid "Plugin AR Design Order Review Guard vyžaduje PHP 8.0 nebo novější."
+msgstr ""
+
+#. translators: %s: minimum WordPress version
+#: src/Application/Requirements.php:43
+#, php-format
+msgid "Plugin AR Design Order Review Guard vyžaduje WordPress %s nebo novější."
+msgstr ""
+
+#: src/Application/Requirements.php:49
+msgid "Plugin AR Design Order Review Guard vyžaduje aktivní WooCommerce."
+msgstr ""
+
+#: src/Support/Updates/GitHubUpdater.php:78
+msgid "Order review guard with secure bin workflow for WooCommerce."
+msgstr ""
+
+#: src/Support/Updates/GitHubUpdater.php:79
+msgid "Changelog není dostupný."
+msgstr ""

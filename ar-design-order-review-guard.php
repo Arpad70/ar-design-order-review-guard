@@ -2,26 +2,29 @@
 /**
  * Plugin Name: AR Design Order Review Guard
  * Description: Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu.
- * Version: 0.2.13
+ * Version: 0.2.14
  * Author: AR Design
  * Update URI: https://github.com/Arpad70/ar-design-order-review-guard
+ * Text Domain: ar-design-order-review-guard
+ * Domain Path: /languages
  * Requires at least: 6.7
  * Requires PHP: 8.0
  */
-
 if (! defined('ABSPATH')) {
 	exit;
 }
 
-define('ARDRG_VERSION', '0.2.13');
+define('ARDRG_VERSION', '0.2.14');
 define('ARDRG_DB_VERSION', '0.2.0');
 define('ARDRG_FILE', __FILE__);
 define('ARDRG_BASENAME', plugin_basename(__FILE__));
 define('ARDRG_PATH', plugin_dir_path(__FILE__));
 define('ARDRG_GITHUB_REPOSITORY', 'Arpad70/ar-design-order-review-guard');
+define('ARDRG_TEXT_DOMAIN', 'ar-design-order-review-guard');
 
 require_once ARDRG_PATH . 'bootstrap/autoload.php';
 ArDesign\OrderReviewGuard\Support\Autoloader::register();
+require_once ARDRG_PATH . 'src/Support/Updates/GitHubUpdater.php';
 
 final class ArDesignOrderReviewGuard
 {
@@ -145,7 +148,7 @@ final class ArDesignOrderReviewGuard
 			}
 
 			$order = wc_get_order($order_id);
-			if (! $order instanceof WC_Order) {
+			if (! $order instanceof \WC_Order) {
 				continue;
 			}
 
@@ -160,9 +163,9 @@ final class ArDesignOrderReviewGuard
 		return add_query_arg('ardrg_bulk_marked', (string) $updated, $redirect_to);
 	}
 
-	public static function registerAdminActionButton(array $actions, $order): array
+	public static function registerAdminActionButton(array $actions, mixed $order): array
 	{
-		if (! $order instanceof WC_Order) {
+		if (! $order instanceof \WC_Order) {
 			return $actions;
 		}
 		if (self::STATUS_SLUG !== $order->get_status()) {
@@ -238,7 +241,7 @@ final class ArDesignOrderReviewGuard
 				$local_time = '' !== $created_at ? self::formatLocalDateTimeFromGmtString($created_at) : '';
 				$user_label = $actor_user_id > 0 ? ('#' . $actor_user_id) : '—';
 				$user = $actor_user_id > 0 ? get_user_by('id', $actor_user_id) : false;
-				if ($user instanceof WP_User) {
+				if ($user instanceof \WP_User) {
 					$user_label = '#' . $actor_user_id . ' (' . $user->user_login . ')';
 				}
 
@@ -380,7 +383,7 @@ final class ArDesignOrderReviewGuard
 			return;
 		}
 		$order = wc_get_order($order_id);
-		if (! $order instanceof WC_Order || self::STATUS_SLUG !== $order->get_status()) {
+		if (! $order instanceof \WC_Order || self::STATUS_SLUG !== $order->get_status()) {
 			echo '<div class="notice notice-error"><p>Secure Bin lze použít pouze pro stav Manuální kontrola.</p></div>';
 			return;
 		}
@@ -441,7 +444,7 @@ final class ArDesignOrderReviewGuard
 	{
 		$order_id = (int) $post->ID;
 		$order = wc_get_order($order_id);
-		if (! $order instanceof WC_Order) {
+		if (! $order instanceof \WC_Order) {
 			echo '<p>' . esc_html__('Objednávka nebyla načtena.', 'ar-design-order-review-guard') . '</p>';
 			return;
 		}
@@ -479,9 +482,9 @@ final class ArDesignOrderReviewGuard
 		return $page_url;
 	}
 
-	public static function renderOrderEditInlinePanel($order): void
+	public static function renderOrderEditInlinePanel(mixed $order): void
 	{
-		if (! $order instanceof WC_Order) {
+		if (! $order instanceof \WC_Order) {
 			return;
 		}
 		if (self::STATUS_SLUG !== $order->get_status()) {
@@ -522,7 +525,7 @@ final class ArDesignOrderReviewGuard
 
 		$secret = trim((string) wp_unslash($_POST['manager_secret'] ?? ''));
 		$hash = (string) get_option(self::OPTION_SECRET_HASH, '');
-		if (! $order instanceof WC_Order || self::STATUS_SLUG !== $order->get_status() || '' === $hash || ! wp_check_password($secret, $hash)) {
+		if (! $order instanceof \WC_Order || self::STATUS_SLUG !== $order->get_status() || '' === $hash || ! wp_check_password($secret, $hash)) {
 			self::audit('secure_bin_failed', array('reason' => 'validation_failed'), $user_id, $order_id);
 			wp_safe_redirect(self::buildPostSecureBinRedirectUrl('secure_bin_wrong_secret', $return_to));
 			exit;
@@ -583,7 +586,7 @@ final class ArDesignOrderReviewGuard
 
 		foreach ($order_ids as $order_id) {
 			$order = wc_get_order($order_id);
-			if (! $order instanceof WC_Order || self::STATUS_SLUG !== $order->get_status()) {
+			if (! $order instanceof \WC_Order || self::STATUS_SLUG !== $order->get_status()) {
 				continue;
 			}
 
@@ -696,7 +699,7 @@ final class ArDesignOrderReviewGuard
 		return admin_url('edit.php?post_type=shop_order&post_status=' . $manual_status);
 	}
 
-	private static function forceDeleteOrder(int $order_id, WC_Order $order): bool
+	private static function forceDeleteOrder(int $order_id, \WC_Order $order): bool
 	{
 		if (function_exists('wc_delete_order')) {
 			$result = wc_delete_order($order_id, true);
@@ -706,7 +709,7 @@ final class ArDesignOrderReviewGuard
 		if (method_exists($order, 'delete')) {
 			$order->delete(true);
 			$check = wc_get_order($order_id);
-			return ! $check instanceof WC_Order;
+			return ! $check instanceof \WC_Order;
 		}
 
 		$result = wp_delete_post($order_id, true);
@@ -770,13 +773,13 @@ final class ArDesignOrderReviewGuard
 		);
 	}
 
-	private static function buildOrderProductsSummary(WC_Order $order): array
+	private static function buildOrderProductsSummary(\WC_Order $order): array
 	{
 		$product_ids = array();
 		$items = array();
 
 		foreach ($order->get_items() as $item) {
-			if (! $item instanceof WC_Order_Item_Product) {
+			if (! $item instanceof \WC_Order_Item_Product) {
 				continue;
 			}
 
@@ -820,33 +823,33 @@ final class ArDesignOrderReviewGuard
 		return '1' === (string) get_transient(self::SECURE_DELETE_TOKEN_PREFIX . $user_id . '_' . $order_id);
 	}
 
-	public static function allowAuthorizedSecureDeletePreDeletePost($delete, WP_Post $post)
+	public static function allowAuthorizedSecureDeletePreDeletePost(mixed $delete, \WP_Post $post): mixed
 	{
 		if ('shop_order' !== $post->post_type) {
 			return $delete;
 		}
 		$order = wc_get_order((int) $post->ID);
-		if ($order instanceof WC_Order && self::STATUS_SLUG === $order->get_status() && self::hasSecureDeleteAuthorization((int) $post->ID)) {
+		if ($order instanceof \WC_Order && self::STATUS_SLUG === $order->get_status() && self::hasSecureDeleteAuthorization((int) $post->ID)) {
 			return null;
 		}
 		return $delete;
 	}
 
-	public static function allowAuthorizedSecureDeletePreTrashPost($trash, WP_Post $post, $previous_status)
+	public static function allowAuthorizedSecureDeletePreTrashPost(mixed $trash, \WP_Post $post, mixed $previous_status): mixed
 	{
 		if ('shop_order' !== $post->post_type) {
 			return $trash;
 		}
 		$order = wc_get_order((int) $post->ID);
-		if ($order instanceof WC_Order && self::STATUS_SLUG === $order->get_status() && self::hasSecureDeleteAuthorization((int) $post->ID)) {
+		if ($order instanceof \WC_Order && self::STATUS_SLUG === $order->get_status() && self::hasSecureDeleteAuthorization((int) $post->ID)) {
 			return null;
 		}
 		return $trash;
 	}
 
-	public static function allowAuthorizedSecureDeleteWoo($check, $order, bool $force_delete)
+	public static function allowAuthorizedSecureDeleteWoo(mixed $check, mixed $order, bool $force_delete): mixed
 	{
-		if (! $order instanceof WC_Order) {
+		if (! $order instanceof \WC_Order) {
 			return $check;
 		}
 		$order_id = (int) $order->get_id();
@@ -892,7 +895,7 @@ final class ArDesignOrderReviewGuard
 		) {$charset};");
 	}
 
-	private static function archiveOrderToSecureBin(WC_Order $order, int $actor_user_id): bool
+	private static function archiveOrderToSecureBin(\WC_Order $order, int $actor_user_id): bool
 	{
 		global $wpdb;
 		$table = $wpdb->prefix . self::SECURE_BIN_TABLE;
@@ -1026,23 +1029,23 @@ final class ArDesignOrderReviewGuard
 		);
 	}
 
-	public static function blockStockReductionForManualReview(bool $can_reduce, $order): bool
+	public static function blockStockReductionForManualReview(bool $can_reduce, mixed $order): bool
 	{
-		if ($order instanceof WC_Order && self::STATUS_SLUG === $order->get_status()) {
+		if ($order instanceof \WC_Order && self::STATUS_SLUG === $order->get_status()) {
 			return false;
 		}
 		return $can_reduce;
 	}
 
-	public static function releaseStockOnManualReviewTransition(int $order_id, string $from, string $to, $order): void
+	public static function releaseStockOnManualReviewTransition(int $order_id, string $from, string $to, mixed $order): void
 	{
 		if (self::STATUS_SLUG !== $to) {
 			return;
 		}
-		if (! $order instanceof WC_Order) {
+		if (! $order instanceof \WC_Order) {
 			$order = wc_get_order($order_id);
 		}
-		if ($order instanceof WC_Order && function_exists('wc_release_stock_for_order')) {
+		if ($order instanceof \WC_Order && function_exists('wc_release_stock_for_order')) {
 			wc_release_stock_for_order($order);
 		}
 	}
@@ -1068,7 +1071,7 @@ final class ArDesignOrderReviewGuard
 		$before = gmdate('Y-m-d H:i:s', time() - (self::STALE_MINUTES * MINUTE_IN_SECONDS));
 		$orders = wc_get_orders(array('type' => 'shop_order', 'status' => array('pending', 'on-hold', 'failed'), 'limit' => 100, 'return' => 'objects', 'date_created' => '<' . $before));
 		foreach ($orders as $order) {
-			if (! $order instanceof WC_Order || $order->is_paid() || self::STATUS_SLUG === $order->get_status()) {
+			if (! $order instanceof \WC_Order || $order->is_paid() || self::STATUS_SLUG === $order->get_status()) {
 				continue;
 			}
 			if (self::isManualReviewReturnProtected($order)) {
@@ -1088,12 +1091,12 @@ final class ArDesignOrderReviewGuard
 		update_option(self::OPTION_LAST_CRON_COMPLETED_AT_GMT, gmdate('Y-m-d H:i:s'), false);
 	}
 
-	public static function trackManualReviewLifecycleFlags(int $order_id, string $from, string $to, $order): void
+	public static function trackManualReviewLifecycleFlags(int $order_id, string $from, string $to, mixed $order): void
 	{
-		if (! $order instanceof WC_Order) {
+		if (! $order instanceof \WC_Order) {
 			$order = wc_get_order($order_id);
 		}
-		if (! $order instanceof WC_Order) {
+		if (! $order instanceof \WC_Order) {
 			return;
 		}
 
@@ -1111,14 +1114,14 @@ final class ArDesignOrderReviewGuard
 		}
 	}
 
-	private static function isManualReviewReturnProtected(WC_Order $order): bool
+	private static function isManualReviewReturnProtected(\WC_Order $order): bool
 	{
 		$seen = (string) $order->get_meta(self::META_MANUAL_REVIEW_SEEN, true);
 		$returned = (string) $order->get_meta(self::META_MANUAL_REVIEW_RETURNED, true);
 		return ('1' === $seen) && ('1' === $returned);
 	}
 
-	private static function evaluateOrderRisk(WC_Order $order): array
+	private static function evaluateOrderRisk(\WC_Order $order): array
 	{
 		$score = 0;
 		$reasons = array();
@@ -1153,12 +1156,12 @@ final class ArDesignOrderReviewGuard
 		return sprintf('Automaticky přesunuto do manuální kontroly. Risk score: %d (threshold: %d).', (int) $risk['score'], $threshold);
 	}
 
-	private static function resolveRiskThreshold(WC_Order $order): int
+	private static function resolveRiskThreshold(\WC_Order $order): int
 	{
 		return self::isNightWindow() ? self::NIGHT_RISK_THRESHOLD : self::DEFAULT_RISK_THRESHOLD;
 	}
 
-	private static function resolveHighTotalLimit(WC_Order $order): float
+	private static function resolveHighTotalLimit(\WC_Order $order): float
 	{
 		return self::isNightWindow() ? self::NIGHT_HIGH_TOTAL_LIMIT : 120.0;
 	}
@@ -1177,7 +1180,7 @@ final class ArDesignOrderReviewGuard
 		$orders = wc_get_orders(array('type' => 'shop_order', 'status' => array(self::STATUS_SLUG), 'limit' => 1000, 'return' => 'objects'));
 		$totals = array('all' => 0, 'night' => 0, 'day' => 0);
 		foreach ($orders as $order) {
-			if (! $order instanceof WC_Order || ! $order->get_date_created()) {
+			if (! $order instanceof \WC_Order || ! $order->get_date_created()) {
 				continue;
 			}
 			$totals['all']++;

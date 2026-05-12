@@ -15,12 +15,17 @@ final class Bootstrap
 	private Requirements $requirements;
 	private Migrator $migrator;
 	private GitHubUpdater $updater;
+	/** @var object */
+	private $rollbackManager;
 
 	private function __construct()
 	{
+		$rollbackManagerClass = '\\ArDesign\\OrderReviewGuard\\Support\\Updates\\RollbackManager';
+
 		$this->requirements = new Requirements();
 		$this->migrator = new Migrator(new Schema());
 		$this->updater = new GitHubUpdater(ARDRG_GITHUB_REPOSITORY, ARDRG_BASENAME, ARDRG_VERSION);
+		$this->rollbackManager = new $rollbackManagerClass(ARDRG_BASENAME, ARDRG_PATH);
 	}
 
 	public static function boot(): self
@@ -33,7 +38,14 @@ final class Bootstrap
 
 	public function run(): void
 	{
+		add_action('init', array($this, 'loadTextDomain'));
+		$this->rollbackManager->register();
 		add_action('plugins_loaded', array($this, 'bootstrapRuntime'), 20);
+	}
+
+	public function loadTextDomain(): void
+	{
+		load_plugin_textdomain(ARDRG_TEXT_DOMAIN, false, dirname(ARDRG_BASENAME) . '/languages');
 	}
 
 	public function bootstrapRuntime(): void

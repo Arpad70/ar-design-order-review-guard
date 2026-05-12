@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AR Design Order Review Guard
  * Description: Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu.
- * Version: 0.2.14
+ * Version: 0.2.15
  * Author: AR Design
  * Update URI: https://github.com/Arpad70/ar-design-order-review-guard
  * Text Domain: ar-design-order-review-guard
@@ -14,7 +14,7 @@ if (! defined('ABSPATH')) {
 	exit;
 }
 
-define('ARDRG_VERSION', '0.2.14');
+define('ARDRG_VERSION', '0.2.15');
 define('ARDRG_DB_VERSION', '0.2.0');
 define('ARDRG_FILE', __FILE__);
 define('ARDRG_BASENAME', plugin_basename(__FILE__));
@@ -218,7 +218,7 @@ final class ArDesignOrderReviewGuard
 		submit_button('Vygenerovat nové tajné heslo', 'primary', 'submit', false);
 		echo '</form>';
 
-		echo '<h2 style="margin-top:24px;display:flex;align-items:baseline;gap:10px;">Přehled manuální kontroly <span style="font-size:13px;font-weight:400;color:#50575e;">' . esc_html(self::getManualReviewCronSummary()) . '</span></h2>';
+		echo '<h2 style="margin-top:24px;display:flex;align-items:baseline;gap:10px;">' . esc_html__('Prehľad manuálnej kontroly', 'ar-design-order-review-guard') . ' <span style="font-size:13px;font-weight:400;color:#50575e;">' . esc_html(self::getManualReviewCronSummary()) . '</span></h2>';
 		echo '<table class="widefat striped" style="max-width:920px;"><tbody>';
 		echo '<tr><td>Manuální kontrola celkem</td><td><strong>' . esc_html((string) $stats['totals']['all']) . '</strong></td></tr>';
 		echo '<tr><td>Noční (22:00-06:00)</td><td>' . esc_html((string) $stats['totals']['night']) . '</td></tr>';
@@ -1222,7 +1222,8 @@ final class ArDesignOrderReviewGuard
 			: __('nenaplánováno', 'ar-design-order-review-guard');
 
 		return sprintf(
-			'Poslední dokončený WP CRON: %s (další plánované spuštění: %s)',
+			/* translators: 1: last completed cron datetime or fallback, 2: next scheduled cron datetime or fallback. */
+			__('Posledný dokončený WP CRON: %1$s (ďalšie plánované spustenie: %2$s)', 'ar-design-order-review-guard'),
 			$last_label,
 			$next_label
 		);

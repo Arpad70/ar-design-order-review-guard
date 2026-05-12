@@ -2,7 +2,7 @@
 # This file is distributed under the same license as the AR Design Order Review Guard plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: AR Design Order Review Guard 0.2.14\n"
+"Project-Id-Version: AR Design Order Review Guard 0.2.15\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/ar-design-order-review-guard\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -110,6 +110,15 @@ msgstr ""
 
 #: ar-design-order-review-guard.php:1061
 msgid "Every 10 Minutes"
+msgstr ""
+
+#: ar-design-order-review-guard.php:221
+msgid "Prehľad manuálnej kontroly"
+msgstr ""
+
+#. translators: 1: last completed cron datetime or fallback, 2: next scheduled cron datetime or fallback.
+#: ar-design-order-review-guard.php:1226
+msgid "Posledný dokončený WP CRON: %1$s (ďalšie plánované spustenie: %2$s)"
 msgstr ""
 
 #: ar-design-order-review-guard.php:1219

@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: AR Design Order Review Guard 0.2.14\n"
+"Project-Id-Version: AR Design Order Review Guard 0.2.15\n"
 "Language: sk_SK\n"
 "Language-Team: Slovenčina\n"
 "MIME-Version: 1.0\n"
@@ -78,6 +78,13 @@ msgstr "Vymazať objednávku (Secure Bin)"
 
 msgid "Every 10 Minutes"
 msgstr "Každých 10 minút"
+
+msgid "Prehľad manuálnej kontroly"
+msgstr "Prehľad manuálnej kontroly"
+
+#. translators: 1: last completed cron datetime or fallback, 2: next scheduled cron datetime or fallback.
+msgid "Posledný dokončený WP CRON: %1$s (ďalšie plánované spustenie: %2$s)"
+msgstr "Posledný dokončený WP CRON: %1$s (ďalšie plánované spustenie: %2$s)"
 
 msgid "zatím neproběhlo"
 msgstr "zatiaľ neprebehlo"

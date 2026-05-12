@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.15 - 2026-05-12
+- zjednotený slovenský text v súhrne WP CRON pre prehľad manuálnej kontroly
+- opravený lokalizovaný nadpis sekcie a fallback texty pre nespustený / nenaplánovaný CRON
+
 ## 0.2.14 - 2026-05-12
 - opraven fatální pád pluginu při načítání adminu způsobený chybějícím `RollbackManager.php`
 - rollback manager je nyní dostupný ve stejném namespace jako update infrastruktura

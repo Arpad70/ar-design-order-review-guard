@@ -44,7 +44,7 @@ jobs:
               echo "Expected rule:"
               echo "- tag \`vX.Y.Z\`"
               echo "- \`VERSION\` file \`X.Y.Z\`"
-            } >> \"$GITHUB_STEP_SUMMARY\"
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 

@@ -2,7 +2,7 @@
 # This file is distributed under the same license as the AR Design Order Review Guard plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: AR Design Order Review Guard 0.2.17\n"
+"Project-Id-Version: AR Design Order Review Guard 0.2.18\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/ar-design-order-review-guard\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"

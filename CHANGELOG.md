@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.18 - 2026-05-12
+- opraven release workflow pre tag build, aby korektne zapisoval diagnostiku do `GITHUB_STEP_SUMMARY`
+- nový release obchádza neúspešný tag `v0.2.17` a publikuje fix updateru aj čistenia ZIP assetov
+
+## 0.2.17 - 2026-05-12
+- opraven updater GitHub releasov, aby preferoval ZIP asset presne zodpovedajúci aktuálnej verzii tagu
+- build pred vytvorením balíčka čistí staré ZIPy v `dist`, takže release už nepribaľuje staršie verzie pluginu
+
 ## 0.2.16 - 2026-05-12
 - doplněno automatické znovunaplánování WP CRON hooku `ar_design_move_unpaid_to_manual_review`, pokud ve frontě chybí
 - opraven stav, kdy přehled manuální kontroly ukazoval `nenaplánované`, protože se CRON po update pluginu sám neobnovil

@@ -114,7 +114,7 @@ final class GitHubUpdater
 		}
 
 		$version = ltrim((string) ($data['tag_name'] ?? ''), 'v');
-		$package = $this->extractZipAssetUrl($data);
+		$package = $this->extractZipAssetUrl($data, $version);
 		$details = (string) ($data['html_url'] ?? '');
 		$body = (string) ($data['body'] ?? '');
 
@@ -149,10 +149,14 @@ final class GitHubUpdater
 		}
 	}
 
-	private function extractZipAssetUrl(array $releaseData): string
+	private function extractZipAssetUrl(array $releaseData, string $releaseVersion = ''): string
 	{
 		$assets = isset($releaseData['assets']) && is_array($releaseData['assets']) ? $releaseData['assets'] : array();
 		$fallbackUrl = '';
+		$preferredVersionedName = '' !== $releaseVersion
+			? strtolower('ar-design-order-review-guard-' . $releaseVersion . '.zip')
+			: '';
+		$preferredPlainName = 'ar-design-order-review-guard.zip';
 
 		foreach ($assets as $asset) {
 			if (! is_array($asset)) {
@@ -165,7 +169,13 @@ final class GitHubUpdater
 				continue;
 			}
 
-			if ('ar-design-order-review-guard.zip' === strtolower($name)) {
+			$normalizedName = strtolower($name);
+
+			if ('' !== $preferredVersionedName && $preferredVersionedName === $normalizedName) {
+				return $url;
+			}
+
+			if ($preferredPlainName === $normalizedName) {
 				return $url;
 			}
 

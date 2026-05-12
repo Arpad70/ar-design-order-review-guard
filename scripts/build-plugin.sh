@@ -15,7 +15,7 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "${OUT_DIR}" "${STAGE_DIR}"
-rm -f "${ZIP_PATH}"
+rm -f "${OUT_DIR}"/*.zip
 
 rsync -a \
   --exclude='.git' \

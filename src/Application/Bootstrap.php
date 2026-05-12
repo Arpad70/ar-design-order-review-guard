@@ -59,6 +59,7 @@ final class Bootstrap
 
 		$this->updater->register();
 		\ArDesignOrderReviewGuard::bootstrap();
+		$this->ensureManualReviewCronIsScheduled();
 	}
 
 	public static function activate(): void
@@ -97,6 +98,19 @@ final class Bootstrap
 		if ($current_plugin_version !== ARDRG_VERSION) {
 			update_option('ardrg_version', ARDRG_VERSION);
 		}
+	}
+
+	private function ensureManualReviewCronIsScheduled(): void
+	{
+		if (wp_next_scheduled(\ArDesignOrderReviewGuard::CRON_HOOK_NAME)) {
+			return;
+		}
+
+		wp_schedule_event(
+			time() + MINUTE_IN_SECONDS,
+			\ArDesignOrderReviewGuard::CRON_RECURRENCE_NAME,
+			\ArDesignOrderReviewGuard::CRON_HOOK_NAME
+		);
 	}
 
 	public function renderBootstrapNotice(): void

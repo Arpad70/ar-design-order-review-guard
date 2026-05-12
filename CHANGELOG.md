@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.16 - 2026-05-12
+- doplněno automatické znovunaplánování WP CRON hooku `ar_design_move_unpaid_to_manual_review`, pokud ve frontě chybí
+- opraven stav, kdy přehled manuální kontroly ukazoval `nenaplánované`, protože se CRON po update pluginu sám neobnovil
+
 ## 0.2.15 - 2026-05-12
 - zjednotený slovenský text v súhrne WP CRON pre prehľad manuálnej kontroly
 - opravený lokalizovaný nadpis sekcie a fallback texty pre nespustený / nenaplánovaný CRON

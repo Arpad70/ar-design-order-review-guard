@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: AR Design Order Review Guard 0.2.15\n"
+"Project-Id-Version: AR Design Order Review Guard 0.2.16\n"
 "Language: sk_SK\n"
 "Language-Team: Slovenčina\n"
 "MIME-Version: 1.0\n"

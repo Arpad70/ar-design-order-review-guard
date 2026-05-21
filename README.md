@@ -8,6 +8,8 @@ Nahradit automatické rušení nezaplacených objednávek bezpečným mezistavem
 - uvolní se rezervace skladu
 - v tomto stavu se blokuje automatické odečtení skladu
 
+Plugin je primární owner guard policy pro `manual-review`, Secure Bin a destruktivní akce nad objednávkou. Slug a label statusu se sdílí přes `wp-content/mu-plugins/ar-design-workflow-shared.php`.
+
 ## Co plugin dělá
 1. Registruje nový Woo status `wc-manual-review`.
 2. Vypíná defaultní Woo akci `wc_cancel_unpaid_orders`.

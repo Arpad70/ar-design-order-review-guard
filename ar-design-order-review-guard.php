@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AR Design Order Review Guard
  * Description: Nahrádza auto-rušenie nezaplatených objednávok bezpečným mezistavom pre manuálnu kontrolu bez rezervácie a odpočtu skladu.
- * Version: 0.2.18
+ * Version: 0.2.19
  * Author: AR Design
  * Update URI: https://github.com/Arpad70/ar-design-order-review-guard
  * Text Domain: ar-design-order-review-guard
@@ -14,7 +14,7 @@ if (! defined('ABSPATH')) {
 	exit;
 }
 
-define('ARDRG_VERSION', '0.2.18');
+define('ARDRG_VERSION', '0.2.19');
 define('ARDRG_DB_VERSION', '0.2.0');
 define('ARDRG_FILE', __FILE__);
 define('ARDRG_BASENAME', plugin_basename(__FILE__));
@@ -30,7 +30,8 @@ final class ArDesignOrderReviewGuard
 {
 	public const CRON_HOOK_NAME = 'ar_design_move_unpaid_to_manual_review';
 	public const CRON_RECURRENCE_NAME = 'ar_design_every_ten_minutes';
-	private const STATUS_SLUG = 'manual-review';
+	private const STATUS_SLUG = ARD_WORKFLOW_STATUS_MANUAL_REVIEW;
+	private const DELETE_BLOCKED_TRANSIENT_PREFIX = 'ard_delete_blocked_';
 	private const STALE_MINUTES = 45;
 	private const DEFAULT_RISK_THRESHOLD = 4;
 	private const NIGHT_RISK_THRESHOLD = 3;
@@ -71,6 +72,10 @@ final class ArDesignOrderReviewGuard
 		add_filter('cron_schedules', array(__CLASS__, 'registerTenMinuteCron'));
 		add_action(self::CRON_HOOK_NAME, array(__CLASS__, 'moveStaleUnpaidOrdersToManualReview'));
 
+		add_filter('pre_delete_post', array(__CLASS__, 'preventPermanentDelete'), 10, 2);
+		add_filter('pre_trash_post', array(__CLASS__, 'preventTrashOrder'), 10, 3);
+		add_filter('woocommerce_pre_delete_order', array(__CLASS__, 'preventWooOrderDelete'), 10, 3);
+
 		// High-priority override for AR Design Reporting deletion blockers.
 		add_filter('pre_delete_post', array(__CLASS__, 'allowAuthorizedSecureDeletePreDeletePost'), 999, 2);
 		add_filter('pre_trash_post', array(__CLASS__, 'allowAuthorizedSecureDeletePreTrashPost'), 999, 3);
@@ -79,34 +84,141 @@ final class ArDesignOrderReviewGuard
 
 	public static function registerStatus(): void
 	{
-		register_post_status(
-			'wc-' . self::STATUS_SLUG,
-			array(
-				'label' => _x('Manuální kontrola', 'Order status', 'ar-design-order-review-guard'),
-				'public' => true,
-				'exclude_from_search' => false,
-				'show_in_admin_all_list' => true,
-				'show_in_admin_status_list' => true,
-				'label_count' => _n_noop('Manuální kontrola <span class="count">(%s)</span>', 'Manuální kontrola <span class="count">(%s)</span>', 'ar-design-order-review-guard'),
-			)
-		);
+		ard_workflow_register_post_statuses(array(self::STATUS_SLUG), 'ar-design-order-review-guard');
 	}
 
 	public static function registerStatusInLists(array $statuses): array
 	{
-		$result = array();
-		$inserted = false;
-		foreach ($statuses as $key => $label) {
-			$result[$key] = $label;
-			if ('wc-pending' === $key) {
-				$result['wc-' . self::STATUS_SLUG] = __('Manuální kontrola', 'ar-design-order-review-guard');
-				$inserted = true;
-			}
+		return ard_workflow_insert_statuses_after($statuses, array(self::STATUS_SLUG), 'ar-design-order-review-guard', 'wc-pending');
+	}
+
+	public static function preventPermanentDelete(mixed $delete, \WP_Post $post): mixed
+	{
+		if ('shop_order' !== $post->post_type) {
+			return $delete;
 		}
-		if (! $inserted) {
-			$result['wc-' . self::STATUS_SLUG] = __('Manuální kontrola', 'ar-design-order-review-guard');
+
+		if (self::hasSecureDeleteAuthorization((int) $post->ID)) {
+			return $delete;
 		}
-		return $result;
+
+		self::blockDeleteAttempt((int) $post->ID, 'delete', 'pre_delete_post');
+
+		return false;
+	}
+
+	public static function preventTrashOrder(mixed $trash, \WP_Post $post, mixed $previous_status): mixed
+	{
+		if ('shop_order' !== $post->post_type) {
+			return $trash;
+		}
+
+		if (self::hasSecureDeleteAuthorization((int) $post->ID)) {
+			return $trash;
+		}
+
+		self::blockDeleteAttempt((int) $post->ID, 'trash', 'pre_trash_post');
+
+		return false;
+	}
+
+	public static function preventWooOrderDelete(mixed $check, mixed $order, bool $force_delete): mixed
+	{
+		if (! $order instanceof \WC_Order) {
+			return $check;
+		}
+
+		$order_id = (int) $order->get_id();
+		if (self::hasSecureDeleteAuthorization($order_id)) {
+			return $check;
+		}
+
+		self::blockDeleteAttempt($order_id, $force_delete ? 'delete' : 'trash', 'woocommerce_pre_delete_order');
+
+		return false;
+	}
+
+	private static function blockDeleteAttempt(int $order_id, string $attempt, string $source): void
+	{
+		if ($order_id <= 0) {
+			return;
+		}
+
+		$actor_user_id = get_current_user_id() ?: null;
+		$attempt = sanitize_key($attempt);
+		if (! in_array($attempt, array('delete', 'trash'), true)) {
+			$attempt = 'delete';
+		}
+
+		self::storeDeleteBlockedNotice($order_id, $attempt, $actor_user_id);
+		self::audit('delete_attempt_blocked', array('attempt' => $attempt, 'source' => $source), $actor_user_id, $order_id);
+		self::logReportingDeleteBlock($order_id, $attempt, $source, $actor_user_id);
+	}
+
+	private static function storeDeleteBlockedNotice(int $order_id, string $attempt, ?int $actor_user_id): void
+	{
+		if (null === $actor_user_id || $actor_user_id <= 0) {
+			return;
+		}
+
+		set_transient(
+			self::DELETE_BLOCKED_TRANSIENT_PREFIX . $actor_user_id,
+			array(
+				'order_id' => $order_id,
+				'attempt' => $attempt,
+			),
+			300
+		);
+	}
+
+	private static function logReportingDeleteBlock(int $order_id, string $attempt, string $source, ?int $actor_user_id): void
+	{
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'ard_audit_log';
+		$existing = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table)));
+		if (! is_string($existing) || '' === $existing) {
+			return;
+		}
+
+		$created_at = gmdate('Y-m-d H:i:s');
+		$context_json = wp_json_encode(array('source' => $source));
+
+		$wpdb->insert(
+			$table,
+			array(
+				'event_type' => 'order_delete_attempt_blocked',
+				'entity_type' => 'order',
+				'entity_id' => $order_id,
+				'order_id' => $order_id,
+				'actor_user_id' => $actor_user_id,
+				'old_value_json' => wp_json_encode(array()),
+				'new_value_json' => wp_json_encode(array('attempt' => $attempt)),
+				'context_json' => $context_json,
+				'created_at_gmt' => $created_at,
+			),
+			array('%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s')
+		);
+
+		if ('delete' !== $attempt) {
+			return;
+		}
+
+		$wpdb->insert(
+			$table,
+			array(
+				'event_type' => 'order_permanent_delete_blocked',
+				'entity_type' => 'order',
+				'entity_id' => $order_id,
+				'order_id' => $order_id,
+				'actor_user_id' => $actor_user_id,
+				'old_value_json' => wp_json_encode(array()),
+				'new_value_json' => wp_json_encode(array()),
+				'context_json' => $context_json,
+				'created_at_gmt' => $created_at,
+			),
+			array('%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s')
+		);
 	}
 
 	public static function registerBulkAction(array $actions): array
@@ -688,7 +800,7 @@ final class ArDesignOrderReviewGuard
 
 	private static function defaultOrdersListUrl(): string
 	{
-		$manual_status = 'wc-' . self::STATUS_SLUG;
+		$manual_status = ard_workflow_wc_status_key(self::STATUS_SLUG);
 		if (class_exists('\\Automattic\\WooCommerce\\Utilities\\OrderUtil')
 			&& method_exists('\\Automattic\\WooCommerce\\Utilities\\OrderUtil', 'custom_orders_table_usage_is_enabled')
 			&& \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled()
@@ -1069,7 +1181,7 @@ final class ArDesignOrderReviewGuard
 			return;
 		}
 		$before = gmdate('Y-m-d H:i:s', time() - (self::STALE_MINUTES * MINUTE_IN_SECONDS));
-		$orders = wc_get_orders(array('type' => 'shop_order', 'status' => array('pending', 'on-hold', 'failed'), 'limit' => 100, 'return' => 'objects', 'date_created' => '<' . $before));
+		$orders = wc_get_orders(array('type' => 'shop_order', 'status' => array('pending', 'on-hold', 'processing'), 'limit' => 100, 'return' => 'objects', 'date_created' => '<' . $before));
 		foreach ($orders as $order) {
 			if (! $order instanceof \WC_Order || $order->is_paid() || self::STATUS_SLUG === $order->get_status()) {
 				continue;

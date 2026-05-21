@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.19 - 2026-05-21
+- `manual-review` registrácia je teraz naviazaná na shared AR Design workflow catalog, takže guard používa rovnaký source of truth ako DPD, GLS a reporting.
+- Guard preberá delete/trash ownership pre objednávky a zapisuje kompatibilné blokovacie transienty aj audit stopu pre reporting vrstvu.
+- Release dorovnáva samostatný guard plugin s refactoring stavom nasadeným na pracovnom webe.
+
 ## 0.2.18 - 2026-05-12
 - opraven release workflow pre tag build, aby korektne zapisoval diagnostiku do `GITHUB_STEP_SUMMARY`
 - nový release obchádza neúspešný tag `v0.2.17` a publikuje fix updateru aj čistenia ZIP assetov

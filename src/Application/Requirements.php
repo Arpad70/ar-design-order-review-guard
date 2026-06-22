@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ArDesign\OrderReviewGuard\Application;
 
+defined('ABSPATH') || exit;
+
 final class Requirements
 {
 	public const MIN_WORDPRESS_VERSION = '6.7';

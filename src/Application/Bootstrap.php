@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace ArDesign\OrderReviewGuard\Application;
 
+defined('ABSPATH') || exit;
+
+require_once __DIR__ . '/HookRegistrar.php';
+
 use ArDesign\OrderReviewGuard\Infrastructure\Database\Migrator;
 use ArDesign\OrderReviewGuard\Infrastructure\Database\Schema;
 use ArDesign\OrderReviewGuard\Support\Updates\GitHubUpdater;
@@ -58,7 +62,7 @@ final class Bootstrap
 		}
 
 		$this->updater->register();
-		\ArDesignOrderReviewGuard::bootstrap();
+		\ArDesign\OrderReviewGuard\Application\HookRegistrar::register();
 		$this->ensureManualReviewCronIsScheduled();
 	}
 

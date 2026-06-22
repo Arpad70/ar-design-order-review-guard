@@ -1,0 +1,9 @@
+.git
+.github
+build
+dist
+scripts
+.distignore
+.DS_Store
+Thumbs.db
+*.log

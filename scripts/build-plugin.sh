@@ -2,31 +2,25 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="$(cat "${ROOT_DIR}/VERSION")"
-OUT_DIR="${ROOT_DIR}/dist"
-PLUGIN_DIR_NAME="ar-design-order-review-guard"
-ZIP_PATH="${OUT_DIR}/${PLUGIN_DIR_NAME}-${VERSION}.zip"
-TMP_DIR="$(mktemp -d)"
-STAGE_DIR="${TMP_DIR}/${PLUGIN_DIR_NAME}"
+SLUG="ar-design-order-review-guard"
+VERSION="$(tr -d '[:space:]' < "$ROOT_DIR/VERSION")"
+BUILD_DIR="$ROOT_DIR/build"
+STAGING_DIR="$BUILD_DIR/$SLUG"
+ZIP_FILE="$BUILD_DIR/$SLUG-$VERSION.zip"
 
-cleanup() {
-  rm -rf "${TMP_DIR}"
-}
-trap cleanup EXIT
+rm -rf "$STAGING_DIR"
+mkdir -p "$STAGING_DIR" "$BUILD_DIR"
 
-mkdir -p "${OUT_DIR}" "${STAGE_DIR}"
-rm -f "${OUT_DIR}"/*.zip
+RSYNC_ARGS=(-a --delete)
+if [[ -f "$ROOT_DIR/.distignore" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        RSYNC_ARGS+=("--exclude=$line")
+    done < "$ROOT_DIR/.distignore"
+fi
 
-rsync -a \
-  --exclude='.git' \
-  --exclude='.github' \
-  --exclude='dist' \
-  --exclude='.DS_Store' \
-  "${ROOT_DIR}/" "${STAGE_DIR}/"
+rsync "${RSYNC_ARGS[@]}" "$ROOT_DIR/" "$STAGING_DIR/"
+rm -f "$ZIP_FILE"
+(cd "$BUILD_DIR" && zip -rq "$(basename "$ZIP_FILE")" "$SLUG")
 
-(
-  cd "${TMP_DIR}"
-  zip -r "${ZIP_PATH}" "${PLUGIN_DIR_NAME}"
-)
-
-echo "Built: ${ZIP_PATH}"
+echo "Created package: $ZIP_FILE"

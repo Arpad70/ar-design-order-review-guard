@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ArDesign\OrderReviewGuard\Infrastructure\Database;
 
+defined('ABSPATH') || exit;
+
 final class Schema
 {
 	/**

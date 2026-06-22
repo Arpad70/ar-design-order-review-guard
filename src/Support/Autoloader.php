@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ArDesign\OrderReviewGuard\Support;
 
+defined('ABSPATH') || exit;
+
 final class Autoloader
 {
 	public static function register(): void

@@ -3,7 +3,7 @@ Contributors: arpad70
 Requires at least: 6.7
 Tested up to: 6.9.4
 Requires PHP: 8.0
-Stable tag: 0.2.20
+Stable tag: 0.2.21
 License: GPLv2
 License URI: https://www.gnu.org/licenses/gpl-2.0.txt
 
